@@ -16,7 +16,7 @@
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>Equator</DisplayName>
+    <DisplayName>EquatorSolver</DisplayName>
     <PublisherDisplayName>Boris Armenta</PublisherDisplayName>
     <Logo>Assets\Package\StoreLogo.png</Logo>
     <Description>A notebook computer algebra system: exact algebra, calculus, equation solving, plots, arbitrary precision, and checking of handwritten worked solutions.</Description>
@@ -35,7 +35,7 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Equator"
+        DisplayName="EquatorSolver"
         Description="Computer algebra notebook: algebra, calculus, plots and checking of handwritten work."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Package\Square150x150Logo.png"
@@ -43,7 +43,7 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Package\Wide310x150Logo.png"
                          Square71x71Logo="Assets\Package\SmallTile.png"
                          Square310x310Logo="Assets\Package\LargeTile.png"
-                         ShortName="Equator">
+                         ShortName="EquatorSolver">
           <uap:ShowNameOnTiles>
             <uap:ShowOn Tile="square150x150Logo" />
             <uap:ShowOn Tile="wide310x150Logo" />
