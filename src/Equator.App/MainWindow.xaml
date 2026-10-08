@@ -66,9 +66,6 @@
                 <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
-            <AppBarButton Label="Check work" Click="CheckWork_Click" ToolTipService.ToolTip="Read handwritten work (photo, scan or pen) and check every step">
-                <AppBarButton.Icon><FontIcon Glyph="&#xE76D;" /></AppBarButton.Icon>
-            </AppBarButton>
             <AppBarButton Label="Add cell" Click="AddCell_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
             </AppBarButton>

@@ -10,15 +10,9 @@
     <Project Path="src/Equator.Core/Equator.Core.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
-    <Project Path="src/Equator.Recognition/Equator.Recognition.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Equator.Core.Tests/Equator.Core.Tests.csproj">
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
-    <Project Path="tests/Equator.Recognition.Tests/Equator.Recognition.Tests.csproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
   </Folder>

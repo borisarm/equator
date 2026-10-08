@@ -54,7 +54,7 @@ public static class Examples
             "N(expr, digits) evaluates to any number of significant digits; identify recognises exact constants from decimals.",
             ["N(pi, 100)", "N(exp(pi*sqrt(163)), 40)", "N(zeta(3), 50)", "identify(N((1 + sqrt(5))/2, 40))", "identify(1.4142135623730951)"]),
         ("Checking work",
-            "Check work (toolbar) reads a photo, a scan or pen writing on this computer and checks every step. In a cell, check takes the steps as text: the first line is the task, each following line one step.",
+            "check takes a worked solution as text and checks every step: the first line is the task, each following line one step.",
             ["check([\"2x + 3 = 7\", \"2x = 4\", \"x = 2\"])", "check([\"x^2 = 9\", \"x = 3\"])",
              "check([\"sqrt(x + 3) = x - 3\", \"x + 3 = (x - 3)^2\", \"x = 1 or x = 6\", \"x = 6\"])",
              "check([\"integrate(x*exp(x), x)\", \"x*exp(x) - integrate(exp(x), x)\", \"x*exp(x) - exp(x)\"])",
