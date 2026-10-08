@@ -394,6 +394,25 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
         }
 
         if (factors.Count == 0) return coeff;
+
+        // sqrt(3) sqrt(31) = sqrt(93): positive rational bases with the same fractional exponent combine.
+        var radicalGroups = factors
+            .Where(f => f is PowExpr { Base: Num { Value.Sign: > 0 }, Exponent: Num { Value.IsInteger: false } })
+            .GroupBy(f => ((PowExpr)f).Exponent)
+            .Where(g => g.Count() > 1)
+            .ToList();
+        if (radicalGroups.Count > 0)
+        {
+            var merged = factors.Where(f => !radicalGroups.Any(g => g.Contains(f))).ToList();
+            foreach (var g in radicalGroups)
+            {
+                var product = g.Aggregate(BigRational.One, (acc, f) => acc * ((Num)((PowExpr)f).Base).Value);
+                merged.Add(Power(new Num(product), g.Key));
+            }
+            merged.Add(coeff);
+            return Times(merged);
+        }
+
         bool unitCoeff = coeff.IsOne;
         if (unitCoeff && factors.Count == 1) return factors[0];
         // -(a + b) -> -a - b, as in Mathematica; other coefficients stay outside so factored forms survive.
@@ -438,6 +457,15 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
         if (b == Infinity || b == ComplexInfinity)
         {
             if (e.IsNumber) return e.IsNegativeNumber ? Zero : b;
+            // Real constant exponents (sqrt(2)/8, -pi) act like numbers.
+            if (e.IsConstant && !e.Contains(I) && !e.IsUndefinedOrInfinite)
+            {
+                double v;
+                try { v = Numerics.NumericEval.EvalReal(e); }
+                catch (MathException) { v = double.NaN; }
+                if (v < 0) return Zero;
+                if (v > 0) return b;
+            }
             return new PowExpr(b, e);
         }
         if (e == Infinity || (e.IsInfinite && e.HasNegativeCoefficient))
@@ -502,6 +530,19 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
             if (e.IsInteger) return Times(mb.Factors.Select(f => Power(f, e)));
             if (mb.Factors.Count == 2 && mb.Factors[0] is Num { Value.IsMinusOne: true } && mb.Factors[1] == I && e is Num { Value: var h2 } && h2 == BigRational.Half)
                 return (One - I) / Sqrt(Two);
+            // (c i)^e = c^e i^e for real c > 0 (both sides have argument π/2), and (−c i)^e = c^e (−i)^e.
+            if (e is Num && mb.Factors.Contains(I))
+            {
+                var k = Times(mb.Factors.Where(f => f != I));
+                if (!k.IsOne && !(k is Num { Value.IsMinusOne: true }) && k.IsConstant && !k.Contains(I))
+                {
+                    double kv;
+                    try { kv = Numerics.NumericEval.EvalReal(k); }
+                    catch (MathException) { kv = double.NaN; }
+                    if (kv > 0) return Times(Power(k, e), Power(I, e));
+                    if (kv < 0) return Times(Power(-k, e), Power(Times(MinusOne, I), e));
+                }
+            }
             // Pull positive numeric coefficients out: (4x)^(1/2) = 2 x^(1/2).
             if (mb.Factors[0] is Num c && c.Value.Sign > 0)
             {

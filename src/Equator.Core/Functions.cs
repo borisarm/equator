@@ -244,6 +244,15 @@ public static class Functions
                     if (name == "gcd") return new Num(g);
                     return g.IsZero ? Expr.Zero : new Num(BigInteger.Abs(ga.Value.Num * gb.Value.Num) / g);
                 }
+                // Polynomials (in any generators).
+                if (!a.IsNumber || !b.IsNumber)
+                {
+                    if (a.IsUndefinedOrInfinite || b.IsUndefinedOrInfinite || a.ContainsAny(z => z is Real) || b.ContainsAny(z => z is Real)) return null;
+                    var (_, da) = Algebra.Rational.NumDen(a);
+                    var (_, db) = Algebra.Rational.NumDen(b);
+                    if (!da.IsNumber || !db.IsNumber) return null;
+                    return Algebra.Factoring.PolynomialGcd([a, b], lcm: name == "lcm");
+                }
                 return null;
         }
         return null;

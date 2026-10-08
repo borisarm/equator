@@ -71,7 +71,8 @@ public static class Integrator
             ?? Trig(f, x, depth)
             ?? ByParts(f, x, depth)
             ?? QuadraticRadical(f, x)
-            ?? ExpandRetry(f, x, depth);
+            ?? ExpandRetry(f, x, depth)
+            ?? Weierstrass(f, x, depth);
     }
 
     private static Expr? ExpandRetry(Expr f, Expr x, int depth)
@@ -276,7 +277,130 @@ public static class Integrator
                 result += new Num(c2) * QuadraticReduction(x + new Num(p / 2), new Num(D), k);
             return result;
         }
+        if (k == 1) return ResidueLogs(pN, pF, x);
         return null;
+    }
+
+    /// <summary>
+    /// ∫ A/F for an irreducible F of degree ≥ 3 whose roots α are known exactly: Σ A(α)/F'(α) log(x − α),
+    /// with each conjugate pair α = a ± bi combined into u log((x − a)² + b²) − 2v atan((x − a)/b), where
+    /// A(α)/F'(α) = u + iv.
+    /// </summary>
+    private static Expr? ResidueLogs(QPoly A, QPoly F, Expr x)
+    {
+        var roots = Solver.PolynomialRoots(F.ToExpr(x), x);
+        if (roots is null || roots.Count != F.Degree || roots.Any(r => r.ContainsAny(z => z is Real))) return null;
+        var dF = F.Derivative();
+        var terms = new List<Expr>();
+        var used = new bool[roots.Count];
+        for (int i = 0; i < roots.Count; i++)
+        {
+            if (used[i]) continue;
+            var parts = ComplexParts(roots[i]);
+            if (parts is null) return null;
+            var (a, b) = parts.Value;
+            var num = ComplexParts(A.ToExpr(x).Substitute(x, roots[i]));
+            var den = ComplexParts(dF.ToExpr(x).Substitute(x, roots[i]));
+            if (num is null || den is null) return null;
+            var (nr, ni) = num.Value;
+            var (dr, di) = den.Value;
+            var modulus = Expansion.Expand(dr * dr + di * di);
+            var u = Simplifier.Simplify((nr * dr + ni * di) / modulus);
+            var v = Simplifier.Simplify((ni * dr - nr * di) / modulus);
+            used[i] = true;
+            if (Simplifier.Simplify(b).IsZero)
+            {
+                terms.Add(u * Expr.Call("log", x - a));
+                continue;
+            }
+            // Find and consume the conjugate root.
+            int j = Enumerable.Range(0, roots.Count).FirstOrDefault(k => !used[k] && IsConjugate(roots[k], a, b), -1);
+            if (j < 0) return null;
+            used[j] = true;
+            if (NumericEval.EvalReal(b) < 0) { b = -b; v = -v; }
+            terms.Add(u * Expr.Call("log", Expansion.Expand(Expr.Power(x - a, 2)) + Simplifier.Simplify(b * b)));
+            terms.Add(-2 * v * Expr.Call("atan", Simplifier.Simplify((x - a) / b)));
+        }
+        return Expr.Plus(terms);
+    }
+
+    private static bool IsConjugate(Expr root, Expr a, Expr b)
+    {
+        var p = ComplexParts(root);
+        if (p is null) return false;
+        try
+        {
+            return Math.Abs(NumericEval.EvalReal(p.Value.Re - a)) < 1e-12 && Math.Abs(NumericEval.EvalReal(p.Value.Im + b)) < 1e-12;
+        }
+        catch (MathException) { return false; }
+    }
+
+    /// <summary>Exact real and imaginary parts of a constant that is polynomial in I; null otherwise.</summary>
+    private static (Expr Re, Expr Im)? ComplexParts(Expr z)
+    {
+        var e = Expansion.Expand(z);
+        var c = PolyView.Coefficients(e, Expr.I);
+        if (c is null || c.Any(k => !k.IsConstant || k.Contains(Expr.I))) return null;
+        Expr re = Expr.Zero, im = Expr.Zero;
+        for (int k = 0; k < c.Count; k++)
+        {
+            switch (k % 4)
+            {
+                case 0: re += c[k]; break;
+                case 1: im += c[k]; break;
+                case 2: re -= c[k]; break;
+                default: im -= c[k]; break;
+            }
+        }
+        // Parts must be real: reject nested radicals of negative numbers that hide an imaginary unit.
+        try
+        {
+            var vr = NumericEval.Eval(re); var vi = NumericEval.Eval(im);
+            if (Math.Abs(vr.Imaginary) > 1e-12 || Math.Abs(vi.Imaginary) > 1e-12) return null;
+        }
+        catch (MathException) { return null; }
+        return (re, im);
+    }
+
+    // ---- rational functions of sin and cos ----------------------------------------------------------
+
+    /// <summary>
+    /// ∫ R(sin u, cos u) dx with u linear in x, by the substitution t = tan(u/2): sin u = 2t/(1 + t²),
+    /// cos u = (1 − t²)/(1 + t²), du = 2 dt/(1 + t²). The result jumps where u ≡ π (mod 2π); definite
+    /// integrals account for that by splitting at the jumps.
+    /// </summary>
+    private static Expr? Weierstrass(Expr f, Expr x, int depth)
+    {
+        var trig = f.Subexpressions().OfType<FnExpr>()
+            .Where(g => g.Name is "sin" or "cos" or "tan" or "cot" or "sec" or "csc" && !g.Args[0].FreeOf(x))
+            .ToList();
+        if (trig.Count == 0) return null;
+        var u = trig[0].Args[0];
+        if (trig.Any(g => g.Args[0] != u)) return null;
+        var slope = LinearSlope(u, x);
+        if (slope is null) return null;
+        var t = new Sym("\u0001wt" + depth);
+        var one = Expr.One;
+        var t2 = Expr.Power(t, 2);
+        var map = new Dictionary<Expr, Expr>();
+        foreach (var g in trig.Distinct())
+        {
+            map[g] = g.Name switch
+            {
+                "sin" => 2 * t / (one + t2),
+                "cos" => (one - t2) / (one + t2),
+                "tan" => 2 * t / (one - t2),
+                "cot" => (one - t2) / (2 * t),
+                "sec" => (one + t2) / (one - t2),
+                _ => (one + t2) / (2 * t),
+            };
+        }
+        var g2 = f.Substitute(map);
+        if (!g2.FreeOf(x)) return null;
+        var integrand = Rational.Cancel(g2 * 2 / (one + t2));
+        var F = RationalIntegrate(integrand, t);
+        if (F is null) return null;
+        return F.Substitute(t, Expr.Call("tan", u / 2)) / slope;
     }
 
     /// <summary>I_k = ∫ dt/(t^2 + D)^k via the standard reduction formula.</summary>

@@ -253,6 +253,97 @@ public class OracleTests
         Assert.True(e2 < e1 / Math.Pow(2, n + 1) * 1.6 + 1e-14, $"series of {f}: errors {e1}, {e2}");
     }
 
+    // ---- polynomial factorisation and gcd --------------------------------------------------------------
+
+    private static Expr RandomPolynomial(Random rng, Sym[] vars, int maxDegree, int terms)
+    {
+        var parts = new List<Expr>();
+        for (int i = 0; i < terms; i++)
+        {
+            Expr t = rng.Next(-5, 6) switch { 0 => 1, var c => c };
+            foreach (var v in vars) t *= Expr.Power(v, rng.Next(0, maxDegree + 1));
+            parts.Add(t);
+        }
+        var p = Expansion.Expand(Expr.Plus(parts));
+        return p.IsNumber || p is not AddExpr ? Expansion.Expand(p + vars[0] + 1) : p;
+    }
+
+    public static IEnumerable<object[]> FactorSeeds() => Enumerable.Range(1, 60).Select(i => new object[] { i });
+
+    [Theory]
+    [MemberData(nameof(FactorSeeds))]
+    public void FactorizationIsCompleteAndExact(int seed)
+    {
+        var rng = new Random(seed);
+        Sym[] all = [new("x"), new("y"), new("z")];
+        var vars = all.Take(1 + seed % 3).ToArray();
+        int k = 2 + rng.Next(2);
+        var factors = Enumerable.Range(0, k).Select(_ => RandomPolynomial(rng, vars, seed % 3 == 0 ? 3 : 2, 2 + rng.Next(3))).ToList();
+        if (seed % 4 == 0) factors.Add(factors[0]); // a repeated factor
+        var p = Expansion.Expand(Expr.Times(factors));
+        var f = Factoring.Factor(p);
+        Assert.Equal(p, Expansion.Expand(f));
+
+        int count = 0;
+        foreach (var part in f is MulExpr m ? m.Factors : [f])
+        {
+            if (part.IsNumber) continue;
+            var (b, e) = part is PowExpr pw && pw.Exponent is Num { Value.IsInteger: true } n ? (pw.Base, (int)n.Value.Num) : (part, 1);
+            count += e;
+            var again = Factoring.Factor(b);
+            Assert.True(Expansion.Expand(again - b).IsZero || Expansion.Expand(again + b).IsZero, $"factor {b} of {p} is not irreducible: {again}");
+        }
+        int planted = factors.Count(q => !q.IsNumber);
+        Assert.True(count >= planted, $"factor({p}) = {f} has {count} factors, expected at least {planted}");
+    }
+
+    [Theory]
+    [MemberData(nameof(FactorSeeds))]
+    public void GcdContainsTheCommonFactor(int seed)
+    {
+        var rng = new Random(seed + 500);
+        Sym[] vars = [new("x"), new("y")];
+        var a = RandomPolynomial(rng, vars, 2, 3);
+        var b = RandomPolynomial(rng, vars, 2, 3);
+        var c = RandomPolynomial(rng, vars, 2, 2);
+        var A = Expansion.Expand(a * c);
+        var B = Expansion.Expand(b * c);
+        var g = Expr.Call("gcd", A, B);
+        Assert.False(g is FnExpr { Name: "gcd" }, "gcd not evaluated");
+        foreach (var (num, what) in new[] { (A, "A"), (B, "B") })
+        {
+            var q = Rational.Cancel(num / g);
+            Assert.True(Rational.NumDen(q).Den.IsNumber, $"gcd {g} does not divide {what} = {num}");
+        }
+        var r = Rational.Cancel(g / c);
+        Assert.True(Rational.NumDen(r).Den.IsNumber, $"gcd {g} is not divisible by the common factor {c}");
+    }
+
+    [Theory]
+    [InlineData("1/(x^4 + 1)")]
+    [InlineData("x^2/(x^4 + 1)")]
+    [InlineData("1/(x^6 + 1)")]
+    [InlineData("1/(x^3 - 2)")]
+    [InlineData("1/(x^5 - 1)")]
+    [InlineData("1/(2 + cos(x))")]
+    [InlineData("1/(1 + sin(x))")]
+    [InlineData("sin(x)/(1 + sin(x) + cos(x))")]
+    public void HigherDegreeAndTrigRationalIntegrals(string integrand) => AntiderivativesAreCorrectEverywhere(integrand);
+
+    [Theory]
+    [InlineData("x^3 - 3x + 1 = 0", 3)]
+    [InlineData("x^3 + x + 1 = 0", 3)]
+    [InlineData("x^5 = 1", 5)]
+    [InlineData("x^4 + 1 = 0", 4)]
+    [InlineData("x^4 + x^2 + 1 = 0", 4)]
+    [InlineData("x^3 - 6x^2 + 11x - 7 = 0", 3)]
+    public void ExactPolynomialRootsAreExactAndCorrect(string equation, int count)
+    {
+        SolutionsSatisfyTheEquation(equation, count);
+        var sols = (ListExpr)Eval($"solve({equation}, x)");
+        Assert.All(sols.Items, s => Assert.DoesNotContain(s.Subexpressions(), z => z is Real));
+    }
+
     // ---- random expressions: transformations must preserve values ----------------------------------
 
     private sealed class Gen(int seed)
@@ -286,7 +377,7 @@ public class OracleTests
         };
     }
 
-    public static IEnumerable<object[]> Seeds() => Enumerable.Range(1, 200).Select(i => new object[] { i });
+    public static IEnumerable<object[]> Seeds() => Enumerable.Range(1, 400).Select(i => new object[] { i });
 
     private static readonly (double X, double Y)[] Points = [(0.37, 1.21), (-1.13, 0.52), (2.29, -0.81), (-0.61, -1.7)];
 

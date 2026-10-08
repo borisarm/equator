@@ -247,8 +247,9 @@ public class KernelTests
         var k = new Kernel();
         var r = (ListExpr)k.EvalText($"solve({f} = 0, x)");
         var fn = NumericEval.Compile1(k.EvalText(f), "x");
-        var real = r.Items.Cast<EqExpr>().Where(e => e.Rhs is Real).ToList();
+        // Roots may be exact (Cardano) or floating point; count the real-valued ones.
+        var real = r.Items.Cast<EqExpr>().Select(e => NumericEval.Eval(e.Rhs)).Where(v => Math.Abs(v.Imaginary) < 1e-9).ToList();
         Assert.Equal(realRoots, real.Count);
-        foreach (var e in real) Assert.True(Math.Abs(fn(((Real)e.Rhs).Value)) < 1e-9);
+        foreach (var v in real) Assert.True(Math.Abs(fn(v.Real)) < 1e-9);
     }
 }

@@ -234,9 +234,25 @@ public sealed class QPoly
         return result;
     }
 
+    /// <summary>(g, s, t) with s a + t b = g = gcd(a, b) (g monic).</summary>
+    public static (QPoly G, QPoly S, QPoly T) ExtendedGcd(QPoly a, QPoly b)
+    {
+        QPoly r0 = a, r1 = b, s0 = Constant(BigRational.One), s1 = Zero, t0 = Zero, t1 = Constant(BigRational.One);
+        while (!r1.IsZero)
+        {
+            var (q, r) = r0.DivRem(r1);
+            (r0, r1) = (r1, r);
+            (s0, s1) = (s1, s0 - q * s1);
+            (t0, t1) = (t1, t0 - q * t1);
+        }
+        if (r0.IsZero) return (r0, s0, t0);
+        var inv = BigRational.One / r0.Lead;
+        return (inv * r0, inv * s0, inv * t0);
+    }
+
     /// <summary>
-    /// Factors over the rationals as far as this implementation can: linear factors from rational roots and
-    /// quadratic factors found by a Kronecker-style search. Returns content and primitive integer factors.
+    /// Complete factorisation over the rationals (Zassenhaus, see <see cref="ZFactor"/>). Returns the content
+    /// and primitive integer factors with multiplicities.
     /// </summary>
     public (BigRational Content, List<(QPoly Factor, int Multiplicity)> Factors) Factor()
     {
@@ -246,62 +262,17 @@ public sealed class QPoly
         foreach (var (sqf, mult) in prim.SquareFree())
         {
             var rest = sqf.ContentPrimitive().Primitive;
-            foreach (var r in rest.RationalRoots())
-            {
-                var lin = new QPoly([-r.Num, r.Den]); // r.Den*x - r.Num
-                rest = rest.DivRem(lin).Quotient.ContentPrimitive().Primitive;
-                factors.Add((lin, mult));
-            }
-            while (rest.Degree >= 4 && rest.FindQuadraticFactor() is { } quad)
-            {
-                factors.Add((quad, mult));
-                rest = rest.DivRem(quad).Quotient.ContentPrimitive().Primitive;
-            }
-            if (rest.Degree >= 1) factors.Add((rest, mult));
+            foreach (var f in ZFactor.FactorSquareFree(rest.Coeffs.Select(c => c.Num).ToArray()))
+                factors.Add((new QPoly(f.Select(c => new BigRational(c))).ContentPrimitive().Primitive, mult));
         }
+        // Linear factors first, then by degree, for stable output.
+        factors = factors.OrderBy(t => t.Item1.Degree).ThenBy(t => -t.Item1[0].ToDouble() / t.Item1.Lead.ToDouble()).ToList();
         // Fix up the content so that content * prod(factors) == this exactly.
         var product = Constant(BigRational.One);
         foreach (var (f, m) in factors)
             for (int k = 0; k < m; k++) product *= f;
         content = Lead / product.Lead;
         return (content, factors);
-    }
-
-    /// <summary>Searches an integer quadratic factor via values at -1, 0, 1 (only for primitive integer polynomials).</summary>
-    private QPoly? FindQuadraticFactor()
-    {
-        var v0 = Eval(BigRational.Zero).Num;
-        var v1 = Eval(BigRational.One).Num;
-        var vm = Eval(BigRational.MinusOne).Num;
-        if (v0.IsZero || v1.IsZero || vm.IsZero) return null;
-        if (BigInteger.Abs(v0).GetBitLength() > 40 || BigInteger.Abs(v1).GetBitLength() > 40 || BigInteger.Abs(vm).GetBitLength() > 40) return null;
-        var d0 = IntMath.Divisors(v0);
-        var d1 = IntMath.Divisors(v1);
-        var dm = IntMath.Divisors(vm);
-        if ((long)d0.Count * d1.Count * dm.Count > 200_000) return null;
-        foreach (var a0 in d0)
-            foreach (var a1 in d1)
-                foreach (var s1 in new[] { 1, -1 })
-                    foreach (var am in dm)
-                        foreach (var sm in new[] { 1, -1 })
-                        {
-                            // q(0)=a0 (sign fixed positive), q(1)=s1*a1, q(-1)=sm*am
-                            BigInteger q0 = a0, q1 = s1 * a1, qm = sm * am;
-                            var twoA = q1 + qm - 2 * q0;
-                            if (!twoA.IsEven) continue;
-                            var A = twoA / 2;
-                            var twoB = q1 - qm;
-                            if (!twoB.IsEven || A.IsZero) continue;
-                            var B = twoB / 2;
-                            foreach (var sign in new[] { 1, -1 })
-                            {
-                                var cand = new QPoly([sign * q0, sign * B, sign * A]);
-                                if (cand.Lead.Sign < 0) continue;
-                                var (_, r) = DivRem(cand);
-                                if (r.IsZero) return cand;
-                            }
-                        }
-        return null;
     }
 
     /// <summary>All complex roots numerically.</summary>

@@ -198,6 +198,37 @@ public static class Builtins
         Add("expand", Alg, "expand(expr)", "Multiplies out products and powers.", "expand((x + 1)^3)", 1, 1, (k, a) => Expansion.Expand(a[0]));
         Add("factor", Alg, "factor(expr)", "Factors polynomials and rational functions over the rationals.", "factor(x^3 - 6x^2 + 11x - 6)", 1, 1,
             (k, a) => Factoring.Factor(a[0]));
+        Add("sqrfree", Alg, "sqrfree(p)", "Square-free factorisation: a product of powers of pairwise coprime square-free polynomials.",
+            "sqrfree(x^3 - x^2 - x + 1)", 1, 1, (k, a) => Factoring.SquareFreeFactor(a[0]));
+        Add("polydiv", Alg, "polydiv(p, q, x)", "Polynomial division in x: [quotient, remainder] with p = quotient·q + remainder.",
+            "polydiv(x^3 + 2x + 1, x^2 + 1, x)", 2, 3, (k, a) =>
+            {
+                var (q, r) = PolyDivide(a[0], a[1], a.Length > 2 ? Var(a[2], "polydiv") : MainVariable(a[0], a[1], "polydiv"));
+                return Expr.List(q, r);
+            }, 2);
+        Add("quo", Alg, "quo(p, q, x)", "Quotient of polynomial division in x.", "quo(x^3 + 2x + 1, x^2 + 1, x)", 2, 3, (k, a) =>
+            PolyDivide(a[0], a[1], a.Length > 2 ? Var(a[2], "quo") : MainVariable(a[0], a[1], "quo")).Quotient, 2);
+        Add("rem", Alg, "rem(p, q, x)", "Remainder of polynomial division in x.", "rem(x^3 + 2x + 1, x^2 + 1, x)", 2, 3, (k, a) =>
+            PolyDivide(a[0], a[1], a.Length > 2 ? Var(a[2], "rem") : MainVariable(a[0], a[1], "rem")).Remainder, 2);
+        Add("resultant", Alg, "resultant(p, q, x)", "Resultant of two polynomials in x (zero exactly when they share a root).",
+            "resultant(x^2 - a, x - b, x)", 3, 3, (k, a) =>
+            {
+                var x = Var(a[2], "resultant");
+                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException("resultant: not a polynomial in " + x + ".");
+                var cq = PolyView.Coefficients(a[1], x) ?? throw new MathException("resultant: not a polynomial in " + x + ".");
+                return Factoring.Factor(Expansion.Expand(Solver.Resultant(cp, cq)));
+            }, 2);
+        Add("discriminant", Alg, "discriminant(p, x)", "Discriminant of a polynomial in x (zero exactly when it has a repeated root).",
+            "discriminant(a*x^2 + b*x + c, x)", 2, 2, (k, a) =>
+            {
+                var x = Var(a[1], "discriminant");
+                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException("discriminant: not a polynomial in " + x + ".");
+                int n = cp.Count - 1;
+                if (n < 1) throw new MathException("discriminant: the polynomial must have positive degree.");
+                var dp = PolyView.Coefficients(Calculus.Derivative.Diff(a[0], x), x)!;
+                var sign = (n * (n - 1) / 2) % 2 == 0 ? Expr.One : Expr.MinusOne;
+                return Factoring.Factor(Rational.Cancel(sign * Solver.Resultant(cp, dp) / cp[n]));
+            }, 1);
         Add("together", Alg, "together(expr)", "Combines a sum of fractions over a common denominator.", "together(1/x + 1/(x + 1))", 1, 1,
             (k, a) => Rational.Together(a[0]));
         Add("cancel", Alg, "cancel(expr)", "Cancels common factors between numerator and denominator.", "cancel((x^2 - 1)/(x - 1))", 1, 1,
@@ -435,6 +466,34 @@ public static class Builtins
         if (Functions.Numeric.Contains(Canonical(name)) || name is "exp" or "sqrt")
             return $"{name}(x) is a built-in mathematical function.";
         return $"No help for '{name}'.";
+    }
+
+    private static Sym MainVariable(Expr p, Expr q, string fn)
+    {
+        var syms = p.FreeSymbols().Union(q.FreeSymbols()).ToList();
+        if (syms.Count == 1) return syms[0];
+        throw new MathException($"{fn}: give the variable, e.g. {fn}(p, q, x).");
+    }
+
+    /// <summary>Long division in x with coefficients that may involve other symbols (over their fraction field).</summary>
+    private static (Expr Quotient, Expr Remainder) PolyDivide(Expr p, Expr q, Sym x)
+    {
+        var cp = PolyView.Coefficients(p, x) ?? throw new MathException($"polydiv: {p} is not a polynomial in {x}.");
+        var cq = PolyView.Coefficients(q, x) ?? throw new MathException($"polydiv: {q} is not a polynomial in {x}.");
+        if (cq.Count == 1 && cq[0].IsZero) throw new MathException("polydiv: division by zero.");
+        var rem = cp.ToList();
+        int dq = cq.Count - 1;
+        var quot = new Expr[Math.Max(rem.Count - dq, 1)];
+        for (int i = 0; i < quot.Length; i++) quot[i] = Expr.Zero;
+        for (int k = rem.Count - 1 - dq; k >= 0; k--)
+        {
+            var c = Rational.Cancel(rem[k + dq] / cq[dq]);
+            quot[k] = c;
+            if (c.IsZero) continue;
+            for (int j = 0; j <= dq; j++) rem[k + j] = Rational.Cancel(rem[k + j] - c * cq[j]);
+        }
+        var r = Expr.Plus(rem.Take(dq).Select((c, i) => c * Expr.Power(x, i)));
+        return (Expr.Plus(quot.Select((c, i) => c * Expr.Power(x, i))), r);
     }
 
     private static BigInteger BigIntArg(Expr e, string fn) =>

@@ -42,14 +42,32 @@ public static class Simplifier
         return s;
     }
 
+    /// <summary>Candidates larger than this many nodes are not transformed further (expansion can explode).</summary>
+    private const int SizeBudget = 600;
+
     private static IEnumerable<Expr> Candidates(Expr e)
     {
         yield return e;
         if (e.IsNumber || e is Sym) yield break;
         Engine.Interrupt.Check();
 
+        if (e.ContainsAny(z => z is PowExpr { Exponent: Num { Value.IsInteger: false } }))
+        {
+            var denested = Safe(() => Radicals.Denest(e));
+            if (denested is not null && denested != e) { yield return denested; e = denested; }
+            var rationalized = Safe(() => RationalizeDenominator(e));
+            if (rationalized is not null) yield return rationalized;
+        }
+
         var expanded = Safe(() => Expansion.Expand(e));
         if (expanded is not null) yield return expanded;
+        // Expanding can blow up (cubes of long sums); only cheap transformations beyond this point.
+        if (expanded is not null && expanded.Complexity() > SizeBudget && expanded.Complexity() > 4 * e.Complexity())
+        {
+            var factoredOnly = Safe(() => Factoring.Factor(e));
+            if (factoredOnly is not null) yield return factoredOnly;
+            yield break;
+        }
 
         var (_, den) = Rational.NumDen(e);
         Expr? cancelled = null;
@@ -87,6 +105,27 @@ public static class Simplifier
         catch (DivideByZeroException) { return null; }
     }
 
+    /// <summary>
+    /// n / (a + b sqrt(r)) → n (a − b sqrt(r)) / (a² − b² r) for a denominator with a single square root of a
+    /// rational number, e.g. 1/(1 + sqrt(2)) → sqrt(2) − 1.
+    /// </summary>
+    private static Expr? RationalizeDenominator(Expr e)
+    {
+        var (n, d) = Rational.NumDen(e);
+        d = Expansion.Expand(d);
+        if (d is not AddExpr sum) return null;
+        var radicals = sum.Terms.SelectMany(t => t.Subexpressions()).OfType<PowExpr>()
+            .Where(p => p.Base is Num && p.Exponent is Num { Value: var h } && h == BigRational.Half).Distinct().ToList();
+        if (radicals.Count != 1) return null;
+        var s = radicals[0];
+        var c = PolyView.Coefficients(d, s);
+        if (c is null || c.Count != 2 || !c.All(k => k.IsNumber)) return null;
+        var conjugate = c[0] - c[1] * s;
+        var newDen = Expansion.Expand(d * conjugate);
+        if (!newDen.IsNumber || newDen.IsZero) return null;
+        return Expansion.Expand(n * conjugate) / newDen;
+    }
+
     private static bool IsTrig(Expr e) => e is FnExpr { Name: "sin" or "cos" or "tan" or "cot" or "sec" or "csc" or "sinh" or "cosh" or "tanh" };
 
     // ---- trigonometric simplification -------------------------------------------------------
@@ -116,6 +155,17 @@ public static class Simplifier
             if (d is not null && d != c) cands.Add(d);
             var f = Safe(() => Factoring.Factor(c));
             if (f is not null) cands.Add(f);
+        }
+        // Angle-addition expansion: sin(x + y) − sin x cos y − cos x sin y → 0.
+        if (basic.ContainsAny(z => z is FnExpr { Name: "sin" or "cos" } fz && fz.Args[0] is AddExpr))
+        {
+            var angles = Safe(() => Expansion.Expand(ExpandAngles(basic)));
+            if (angles is not null)
+            {
+                cands.Add(angles);
+                var ac = Safe(() => Rational.Cancel(Expansion.Expand(ReplaceSquares(angles, "sin", "cos", -1))));
+                if (ac is not null) cands.Add(ac);
+            }
         }
         var reduced = Safe(() => TrigReduce(basic));
         if (reduced is not null)
@@ -166,6 +216,20 @@ public static class Simplifier
         };
         return Expr.Times(rest.Concat(units.Skip(2)).Append(combined));
     }
+
+    /// <summary>sin(a + b) → sin a cos b + cos a sin b and cos(a + b) → cos a cos b − sin a sin b, recursively.</summary>
+    public static Expr ExpandAngles(Expr e) => e.MapBottomUp(z =>
+    {
+        if (z is FnExpr { Name: "sin" or "cos" } f && f.Args[0] is AddExpr s && s.Terms.Count <= 6)
+        {
+            var a = s.Terms[0];
+            var b = Expr.Plus(s.Terms.Skip(1));
+            Expr Sin(Expr u) => ExpandAngles(Expr.Call("sin", u));
+            Expr Cos(Expr u) => ExpandAngles(Expr.Call("cos", u));
+            return f.Name == "sin" ? Sin(a) * Cos(b) + Cos(a) * Sin(b) : Cos(a) * Cos(b) - Sin(a) * Sin(b);
+        }
+        return z;
+    });
 
     /// <summary>tan -> sin/cos, sec -> 1/cos, etc.</summary>
     private static Expr ToSinCos(Expr e) => e.MapBottomUp(x => x switch

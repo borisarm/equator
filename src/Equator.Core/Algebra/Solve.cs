@@ -72,12 +72,120 @@ public static class Solver
 
     private static IEnumerable<Expr> KthRoots(Expr r, int k)
     {
-        var principal = Expr.Power(r, new Num(new BigRational(1, k)));
+        var principal = k == 2 ? ComplexSqrt(r) ?? Expr.Power(r, Expr.Half) : Expr.Power(r, new Num(new BigRational(1, k)));
         if (k == 2) return [Tidy(-principal), Tidy(principal)];
+        // Real constants: |r|^(1/k) (cos θ + i sin θ) with θ = (arg r + 2πj)/k, exact at the standard angles.
+        if (r.IsConstant && !r.Contains(Expr.I) && !r.IsUndefinedOrInfinite)
+        {
+            double v;
+            try { v = NumericEval.EvalReal(r); }
+            catch (MathException) { v = double.NaN; }
+            if (!double.IsNaN(v) && v != 0)
+            {
+                var m = Expr.Power(v > 0 ? r : -r, new Num(new BigRational(1, k)));
+                var roots = new List<Expr>();
+                for (int j = 0; j < k; j++)
+                {
+                    var theta = Expr.Pi * new Num(new BigRational((v > 0 ? 0 : 1) + 2 * j, k));
+                    roots.Add(Tidy(Expansion.Expand(m * (Expr.Call("cos", theta) + Expr.I * Expr.Call("sin", theta)))));
+                }
+                return roots;
+            }
+        }
         var list = new List<Expr>();
         for (int j = 0; j < k; j++)
             list.Add(Tidy(principal * Expr.Exp(2 * Expr.Pi * Expr.I * new Num(new BigRational(j, k)))));
         return list;
+    }
+
+    /// <summary>
+    /// Principal square root of a non-real constant a + b i in explicit form:
+    /// sqrt((|z| + a)/2) + i sign(b) sqrt((|z| − a)/2), with the radicals denested where possible.
+    /// </summary>
+    public static Expr? ComplexSqrt(Expr z)
+    {
+        if (!z.IsConstant || !z.Contains(Expr.I)) return null;
+        var c = PolyView.Coefficients(Expansion.Expand(z), Expr.I);
+        if (c is null || c.Count != 2 || c.Any(t => t.Contains(Expr.I))) return null;
+        var (a, b) = (c[0], c[1]);
+        double bv;
+        try { bv = NumericEval.EvalReal(b); _ = NumericEval.EvalReal(a); }
+        catch (MathException) { return null; }
+        if (double.IsNaN(bv) || bv == 0) return null;
+        var modulus = Radicals.Denest(Expr.Sqrt(Simplifier.Simplify(Expansion.Expand(a * a + b * b))));
+        var re = Radicals.Denest(Expr.Sqrt(Simplifier.Simplify((modulus + a) / 2)));
+        var im = Radicals.Denest(Expr.Sqrt(Simplifier.Simplify((modulus - a) / 2)));
+        return Tidy(re + (bv > 0 ? Expr.I : -Expr.I) * im);
+    }
+
+    /// <summary>
+    /// Roots of an irreducible cubic in radicals (Cardano). With three real roots (casus irreducibilis) the
+    /// trigonometric form 2 sqrt(−p/3) cos(θ/3 − 2πk/3) is used, which stays real.
+    /// </summary>
+    private static List<Expr>? CubicRoots(QPoly f)
+    {
+        // Depress: x = t − b/(3a), t³ + p t + q = 0.
+        var a = f[3]; var b = f[2] / a; var c = f[1] / a; var d = f[0] / a;
+        var p = c - b * b / 3;
+        var q = 2 * b * b * b / 27 - b * c / 3 + d;
+        var shift = new Num(-b / 3);
+        var disc = -(4 * p * p * p + 27 * q * q);
+        var roots = new List<Expr>();
+        if (disc.Sign > 0)
+        {
+            // Three real roots.
+            var m = 2 * Expr.Sqrt(new Num(-p / 3));
+            var theta = Expr.Call("acos", new Num(3 * q / (2 * p)) * Expr.Sqrt(new Num(-3 / p)));
+            for (int k = 0; k < 3; k++)
+                roots.Add(Tidy(m * Expr.Call("cos", theta / 3 - 2 * Expr.Pi * k / 3) + shift));
+            return roots;
+        }
+        // One real root: Cardano with real cube roots, then the complex pair.
+        var sq = Expr.Sqrt(new Num(q * q / 4 + p * p * p / 27));
+        var u = RealCubeRoot(-new Num(q / 2) + sq);
+        var v = RealCubeRoot(-new Num(q / 2) - sq);
+        var omega = (-1 + Expr.I * Expr.Sqrt(3)) / 2;
+        var omega2 = (-1 - Expr.I * Expr.Sqrt(3)) / 2;
+        roots.Add(Tidy(u + v + shift));
+        roots.Add(Tidy(Expansion.Expand(omega * u + omega2 * v + shift)));
+        roots.Add(Tidy(Expansion.Expand(omega2 * u + omega * v + shift)));
+        return roots;
+    }
+
+    /// <summary>n when the monic primitive polynomial f is the cyclotomic polynomial Φ_n.</summary>
+    private static int? CyclotomicIndex(QPoly f)
+    {
+        int d = f.Degree;
+        if (!f.Lead.IsOne || f.Coeffs.Any(c => !c.IsInteger)) return null;
+        // φ(n) = d implies n ≤ 2 d² (very generous); try the n with φ(n) = d.
+        for (int n = 2; n <= Math.Max(6, 2 * d * d) && n <= 2000; n++)
+        {
+            if (EulerPhi(n) != d) continue;
+            var c = ZFactor.Cyclotomic(n);
+            if (c.Length == f.Coeffs.Count && c.Select((v, i) => v == f[i].Num).All(b => b)) return n;
+        }
+        return null;
+    }
+
+    private static int EulerPhi(int n)
+    {
+        int result = n, m = n;
+        for (int p = 2; p * p <= m; p++)
+        {
+            if (m % p != 0) continue;
+            while (m % p == 0) m /= p;
+            result -= result / p;
+        }
+        if (m > 1) result -= result / m;
+        return result;
+    }
+
+    /// <summary>The real cube root of a real constant (negative arguments give negative roots).</summary>
+    private static Expr RealCubeRoot(Expr r)
+    {
+        double v = NumericEval.EvalReal(r);
+        var third = new Num(new BigRational(1, 3));
+        return v < 0 ? -Expr.Power(-r, third) : Expr.Power(r, third);
     }
 
     private static List<Expr> FactorRoots(QPoly f)
@@ -88,6 +196,22 @@ public static class Solver
                 return [new Num(-f[0] / f[1])];
             case 2:
                 return Quadratic(new Num(f[2]), new Num(f[1]), new Num(f[0]));
+        }
+        // Binomial a x^n + b: the n-th roots of −b/a.
+        if (Enumerable.Range(1, f.Degree - 1).All(i => f[i].IsZero))
+            return KthRoots(new Num(-f[0] / f.Lead), f.Degree).ToList();
+        if (f.Degree == 3 && CubicRoots(f) is { } cubic) return cubic;
+        if (CyclotomicIndex(f) is { } n)
+        {
+            // Primitive n-th roots of unity: cos(2πj/n) + i sin(2πj/n) with gcd(j, n) = 1.
+            var unity = new List<Expr>();
+            for (int j = 1; j <= n; j++)
+            {
+                if (System.Numerics.BigInteger.GreatestCommonDivisor(j, n) != 1) continue;
+                var theta = 2 * Expr.Pi * new Num(new BigRational(j, n));
+                unity.Add(Tidy(Expr.Call("cos", theta) + Expr.I * Expr.Call("sin", theta)));
+            }
+            return unity;
         }
         // Even polynomial: substitute y = x^2.
         if (f.Coeffs.Select((c, i) => (c, i)).All(t => t.i % 2 == 0 || t.c.IsZero) && f.Degree == 4)

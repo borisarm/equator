@@ -83,6 +83,8 @@ public static class Limits
                     }
                     var sum = Expr.Plus(parts);
                     if (!Indeterminate(sum)) return sum;
+                    // ∞ − ∞ between logarithms: Σ cᵢ log(uᵢ) = log(Π uᵢ^cᵢ) for uᵢ > 0.
+                    if (CombinedLogs(s, x, a, dir, depth) is { } viaLogs) return viaLogs;
                     // ∞ − ∞: combine over a common denominator and try again.
                     return Quotient(f, x, a, dir, depth);
                 }
@@ -182,6 +184,43 @@ public static class Limits
                 }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Groups terms c log(u) by |c| and replaces each group c (log u₁ − log u₂ + ...) by c log(u₁/u₂ ...),
+    /// whose argument is a single (usually rational) function with a computable limit. Valid because every
+    /// uᵢ is positive near the point.
+    /// </summary>
+    private static Expr? CombinedLogs(AddExpr s, Expr x, Expr a, int dir, int depth)
+    {
+        var groups = new List<(Expr C, List<Expr> Args)>();
+        var others = new List<Expr>();
+        foreach (var t in s.Terms)
+        {
+            var (c, rest) = t is MulExpr m && m.Factors.Count(z => !z.FreeOf(x)) == 1
+                ? (Expr.Times(m.Factors.Where(z => z.FreeOf(x))), m.Factors.First(z => !z.FreeOf(x)))
+                : (Expr.One, t);
+            if (rest is FnExpr { Name: "log" } lg && c.IsConstant && IsFiniteNumber(c) && PositiveNear(lg.Args[0], x, a, dir, depth))
+            {
+                int gi = groups.FindIndex(g => g.C == c || g.C == -c);
+                if (gi < 0) { groups.Add((c, [lg.Args[0]])); continue; }
+                groups[gi].Args.Add(groups[gi].C == c ? lg.Args[0] : Expr.One / lg.Args[0]);
+            }
+            else others.Add(t);
+        }
+        if (!groups.Any(g => g.Args.Count >= 2)) return null;
+        var total = Lim(Expr.Plus(others), x, a, dir, depth + 1);
+        if (total is null || Indeterminate(total)) return null;
+        foreach (var (c, args) in groups)
+        {
+            var lp = Lim(Rational.Cancel(Expr.Times(args)), x, a, dir, depth + 1);
+            if (lp is null || Indeterminate(lp)) return null;
+            Expr logPart = lp == Expr.Infinity ? Expr.Infinity : lp.IsZero ? -Expr.Infinity : lp.IsInfinite ? Expr.Undefined : Expr.Call("log", lp);
+            if (logPart == Expr.Undefined) return null;
+            total += c * logPart;
+            if (Indeterminate(total)) return null;
+        }
+        return total;
     }
 
     private static bool IsFiniteNumber(Expr e)

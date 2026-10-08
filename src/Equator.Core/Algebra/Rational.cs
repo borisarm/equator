@@ -110,28 +110,26 @@ public static class Rational
         if (d.IsOne || n.IsZero) return n;
         if (d.IsNumber) return n / d;
 
-        var vars = n.FreeSymbols().Union(d.FreeSymbols()).ToList();
-        if (vars.Count == 1)
+        // Polynomial in some generators: divide both by their gcd.
+        var ring = PolyRing.For([n, d]);
+        if (ring is not null && ring.ToPoly(n) is { } pn && ring.ToPoly(d) is { } pd)
         {
-            var x = vars[0];
-            var pn = PolyView.ToQPoly(n, x);
-            var pd = PolyView.ToQPoly(d, x);
-            if (pn is not null && pd is not null)
+            var g = PolyGcd.Gcd(pn, pd);
+            if (!g.IsConstant)
             {
-                var g = QPoly.Gcd(pn, pd);
-                if (g.Degree > 0)
-                {
-                    pn = pn.DivRem(g).Quotient;
-                    pd = pd.DivRem(g).Quotient;
-                }
-                // Normalise: monic-ish denominator with integer coefficients.
-                var (cd, primD) = pd.ContentPrimitive();
-                var num = (BigRational.One / cd) * pn;
-                var (cn, primN) = num.ContentPrimitive();
-                return new Num(cn) * primN.ToExpr(x) / primD.ToExpr(x);
+                pn = MPoly.TryDivide(pn, g)!;
+                pd = MPoly.TryDivide(pd, g)!;
             }
+            // Normalise: integer primitive denominator with positive leading coefficient, content in front.
+            var cd = pd.RationalContent();
+            pd = (BigRational.One / cd) * pd;
+            pn = (BigRational.One / cd) * pn;
+            var cn = pn.IsZero ? BigRational.One : pn.RationalContent();
+            if (cn.Sign < 0) cn = -cn;
+            pn = (BigRational.One / cn) * pn;
+            return new Num(cn) * ring.ToExpr(pn) / ring.ToExpr(pd);
         }
-        // Multivariate (or non-polynomial): cancel common factors structurally after factoring.
+        // Not polynomial (e.g. floating-point coefficients): cancel common factors structurally after factoring.
         var fn = Factoring.Factor(n);
         var fd = Factoring.Factor(d);
         var q = fn / fd;
