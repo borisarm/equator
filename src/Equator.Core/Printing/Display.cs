@@ -47,7 +47,7 @@ public static class Display
     public static D Build(Expr e) => e switch
     {
         Num n => Number(n.Value),
-        Real r => RealNumber(r.Value),
+        Real r => RealNumber(r),
         Sym s => Symbol(s),
         StrExpr str => new DAtom(str.Value, "\"" + str.Value + "\"", "\\text{" + str.Value + "}", AtomKind.Text),
         AddExpr a => Sum(a),
@@ -69,6 +69,22 @@ public static class Display
     }
 
     private static DAtom Int(string s) => new(s, s, s, AtomKind.Number);
+
+    public static D RealNumber(Real r) => r.Big is { } b ? BigRealNumber(b, r.Digits) : RealNumber(r.Value);
+
+    /// <summary>An arbitrary-precision number shown with its significant digits.</summary>
+    public static D BigRealNumber(Numerics.BigFloat b, int digits)
+    {
+        if (b.Sign < 0) return new DNeg(BigRealNumber(-b, digits));
+        if (b.IsZero) return new DAtom("0.0", "0.0", "0.0", AtomKind.Number);
+        var (_, ds, e10) = b.ToDecimal(digits);
+        if (e10 >= -5 && e10 < digits)
+        {
+            var s = b.ToString(digits);
+            return new DAtom(s, s, s, AtomKind.Number);
+        }
+        return new DSci(ds[0] + "." + (ds.Length > 1 ? ds[1..] : "0"), (int)e10);
+    }
 
     public static D RealNumber(double v)
     {
@@ -209,9 +225,17 @@ public static class Display
         else if (factors[0] is Real r)
         {
             factors.RemoveAt(0);
-            var v = r.Value;
-            if (v < 0) { negative = true; v = -v; }
-            if (v != 1) num.Add(RealNumber(v));
+            if (r.Big is { } big)
+            {
+                if (big.Sign < 0) { negative = true; big = -big; }
+                num.Add(BigRealNumber(big, r.Digits));
+            }
+            else
+            {
+                var v = r.Value;
+                if (v < 0) { negative = true; v = -v; }
+                if (v != 1) num.Add(RealNumber(v));
+            }
         }
 
         // Polynomial part first, then exponentials and functions, then parenthesised sums: x e^(-x^2) sin(x) (x + 1).

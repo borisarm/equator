@@ -97,8 +97,16 @@ public static class NumericEval
             case "cot": return real ? 1 / Math.Tan(r) : 1 / Complex.Tan(x);
             case "sec": return real ? 1 / Math.Cos(r) : 1 / Complex.Cos(x);
             case "csc": return real ? 1 / Math.Sin(r) : 1 / Complex.Sin(x);
-            case "asin": return real && Math.Abs(r) <= 1 ? Math.Asin(r) : Complex.Asin(x);
-            case "acos": return real && Math.Abs(r) <= 1 ? Math.Acos(r) : Complex.Acos(x);
+            // On the branch cuts |x| > 1 use the same side as the arbitrary-precision evaluator (and
+            // Mathematica): asin(x) = sign(x) (π/2 − i log(|x| + sqrt(x² − 1))), acos = π/2 − asin.
+            case "asin":
+                if (real && Math.Abs(r) <= 1) return Math.Asin(r);
+                if (real) return Math.Sign(r) * new Complex(Math.PI / 2, -Math.Log(Math.Abs(r) + Math.Sqrt(r * r - 1)));
+                return Complex.Asin(x);
+            case "acos":
+                if (real && Math.Abs(r) <= 1) return Math.Acos(r);
+                if (real) return Math.PI / 2 - Math.Sign(r) * new Complex(Math.PI / 2, -Math.Log(Math.Abs(r) + Math.Sqrt(r * r - 1)));
+                return Complex.Acos(x);
             case "atan": return real ? Math.Atan(r) : Complex.Atan(x);
             case "acot": return real ? Math.Atan(1 / r) : Complex.Atan(1 / x);
             case "asec": return real && Math.Abs(r) >= 1 ? Math.Acos(1 / r) : Complex.Acos(1 / x);
@@ -127,6 +135,7 @@ public static class NumericEval
             case "gamma": return Gamma(r);
             case "factorial": return Gamma(r + 1);
             case "erf": return Erf(r);
+            case "zeta": if (real) return ZetaFunction.Zeta(r); break;
             case "atan2": return Math.Atan2(a[0].Real, a[1].Real);
             case "max": return a.Max(c => c.Real);
             case "min": return a.Min(c => c.Real);
@@ -301,6 +310,7 @@ public static class NumericEval
                         "gamma" => Gamma,
                         "factorial" => v => Gamma(v + 1),
                         "erf" => Erf,
+                        "zeta" => ZetaFunction.Zeta,
                         _ => null,
                     };
                     if (fn is not null && args.Length == 1)

@@ -11,7 +11,7 @@ public static class Functions
     [
         "sin", "cos", "tan", "cot", "sec", "csc", "asin", "acos", "atan", "acot", "asec", "acsc",
         "sinh", "cosh", "tanh", "coth", "sech", "csch", "asinh", "acosh", "atanh",
-        "log", "abs", "sign", "floor", "ceil", "round", "gamma", "factorial", "erf", "re", "im", "conj", "arg",
+        "log", "abs", "sign", "floor", "ceil", "round", "gamma", "factorial", "erf", "re", "im", "conj", "arg", "zeta",
     ];
 
     private static readonly HashSet<string> OddFunctions = ["sin", "tan", "cot", "csc", "asin", "atan", "acot", "sinh", "tanh", "coth", "csch", "asinh", "atanh", "erf"];
@@ -38,6 +38,16 @@ public static class Functions
             // Floating point argument: evaluate numerically.
             if (Numeric.Contains(name) && x.IsConstant && x.ContainsAny(e => e is Real) && !x.IsUndefinedOrInfinite)
             {
+                if (BigEval.PrecisionOf(x) is int digits)
+                {
+                    try
+                    {
+                        int bits = BigFloat.DigitsToBits(digits) + 16;
+                        return BigEval.ToExpr(BigEval.Function(name, [BigEval.Eval(x, bits)], bits), digits);
+                    }
+                    catch (MathException) { return FnExpr.Inert(name, x); }
+                    catch (DivideByZeroException) { return Expr.ComplexInfinity; }
+                }
                 var v = NumericEval.Eval(FnExpr.Inert(name, x));
                 if (!double.IsNaN(v.Real)) return NumericEval.FromComplex(v);
             }
@@ -198,6 +208,17 @@ public static class Functions
                         return new Num(c) * Expr.Sqrt(Expr.Pi);
                     }
                 }
+                return null;
+            case "zeta":
+                if (x is Num { Value.IsInteger: true } zn && System.Numerics.BigInteger.Abs(zn.Value.Num) <= 200)
+                {
+                    int s = (int)zn.Value.Num;
+                    if (s == 1) return Expr.ComplexInfinity;
+                    if (s == 0) return new Num(new BigRational(-1, 2));
+                    if (s < 0) return new Num(-Calculus.Sums.Bernoulli(1 - s) / (1 - s)); // ζ(−n) = −B_{n+1}/(n+1)
+                    if (s % 2 == 0) return Calculus.Sums.Zeta(s);
+                }
+                if (x == Expr.Infinity) return Expr.One;
                 return null;
             case "re":
                 return x.IsNumber ? x : null;

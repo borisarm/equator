@@ -283,7 +283,27 @@ public static class Builtins
         Add("rhs", Alg, "rhs(eq)", "Right-hand side of an equation.", "rhs(x^2 = 4)", 1, 1, (k, a) => a[0] is EqExpr q ? q.Rhs : throw new MathException("rhs: not an equation."));
 
         // Numeric
-        Add("N", Num, "N(expr)", "Numerical (floating point) value.", "N(pi^2/6)", 1, 2, (k, a) => ToNumeric(a[0]));
+        Add("N", Num, "N(expr)  ·  N(expr, digits)", "Numerical value: machine precision, or the given number of significant digits.",
+            "N(pi, 50)", 1, 2, (k, a) =>
+            {
+                if (a.Length == 1) return ToNumeric(a[0]);
+                int digits = Int(a[1], "Digits");
+                if (digits < 1 || digits > 20000) throw new MathException("N: digits must be between 1 and 20000.");
+                return ToNumeric(a[0], digits);
+            });
+        Add("identify", Num, "identify(x)", "Recognises a decimal number as an exact constant (rational, algebraic of small degree, combinations of π, e, logs and square roots).",
+            "identify(N(sqrt(2) + pi, 40))", 1, 1, (k, a) =>
+            {
+                var x = a[0];
+                var (value, digits) = x switch
+                {
+                    Real { Big: { } b } r => (b, r.Digits),
+                    Real r => (BigFloat.FromDouble(r.Value, 64), 15),
+                    _ when x.IsConstant && !x.IsUndefinedOrInfinite => (BigEval.Eval(x, BigFloat.DigitsToBits(60)).Re, 60),
+                    _ => throw new MathException("identify: expected a number."),
+                };
+                return Identify.Constant(value, digits) ?? x;
+            });
         Add("re", Num, "re(z)", "Real part.", "re(3 + 4I)", 1, 1, (k, a) => ComplexPart(a[0], true));
         Add("im", Num, "im(z)", "Imaginary part.", "im(3 + 4I)", 1, 1, (k, a) => ComplexPart(a[0], false));
 
@@ -553,6 +573,37 @@ public static class Builtins
         return real ? re : im;
     }
 
+    /// <summary>
+    /// Arbitrary-precision numeric value with the given significant digits. Constant subexpressions are
+    /// evaluated as a whole (so cancellation is handled at full precision); symbols are kept.
+    /// </summary>
+    public static Expr ToNumeric(Expr e, int digits)
+    {
+        switch (e)
+        {
+            case GraphicsExpr or StrExpr or Sym { IsSpecial: false }: return e;
+            case ListExpr or EqExpr: return e.WithArgs(e.Args.Select(x => ToNumeric(x, digits)).ToArray());
+            case FnExpr { Name: "@rel" } rel: return FnExpr.Inert("@rel", rel.Args[0], ToNumeric(rel.Args[1], digits), ToNumeric(rel.Args[2], digits));
+        }
+        if (e.IsConstant && !e.IsUndefinedOrInfinite)
+        {
+            try
+            {
+                // Work with extra digits so the requested ones are correct after rounding.
+                var bits = BigFloat.DigitsToBits(digits + 10) + 32;
+                return BigEval.ToExpr(BigEval.Eval(e, bits), digits);
+            }
+            catch (MathException) { }
+            catch (DivideByZeroException) { return Expr.ComplexInfinity; }
+        }
+        return e switch
+        {
+            PowExpr p => Expr.Power(ToNumeric(p.Base, digits), p.Exponent is Num { Value.IsInteger: true } ? p.Exponent : ToNumeric(p.Exponent, digits)),
+            _ when e.Args.Count == 0 => e,
+            _ => e.WithArgs(e.Args.Select(x => ToNumeric(x, digits)).ToArray()),
+        };
+    }
+
     /// <summary>Converts exact numbers and constants to floating point, keeping integer exponents exact.</summary>
     public static Expr ToNumeric(Expr e) => e switch
     {
@@ -562,6 +613,6 @@ public static class Builtins
         PowExpr p => Expr.Power(ToNumeric(p.Base), p.Exponent is Num { Value.IsInteger: true } ? p.Exponent : ToNumeric(p.Exponent)),
         GraphicsExpr or StrExpr => e,
         _ when e.Args.Count == 0 => e,
-        _ => e.WithArgs(e.Args.Select(ToNumeric).ToArray()),
+        _ => e.WithArgs(e.Args.Select(x => ToNumeric(x)).ToArray()),
     };
 }

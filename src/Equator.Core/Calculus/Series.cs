@@ -181,17 +181,17 @@ public static class Sums
             }
         }
 
-        // p-series sum 1/k^p with even p.
-        if (f is PowExpr { Base: var bk, Exponent: Num { Value.IsInteger: true } pe } && bk == k && pe.Value.Sign < 0)
+        // p-series Σ 1/k^p = ζ(p) − Σ_{j<a} 1/j^p (exact for even p, zeta(p) otherwise).
+        if (f is PowExpr { Base: var bk, Exponent: var pe } && bk == k && pe.FreeOf(k)
+            && a is Num { Value.IsInteger: true } first && first.Value.Num >= 1 && first.Value.Num < 1000)
         {
-            int p = (int)(-pe.Value.Num);
-            if (p == 1) return Expr.Infinity;
-            if (p % 2 == 0 && p <= 30 && a is Num { Value.IsInteger: true } start && start.Value.Num >= 1 && start.Value.Num < 1000)
-            {
-                var zeta = Zeta(p);
-                var head = Expr.Plus(Enumerable.Range(1, (int)start.Value.Num - 1).Select(j => Expr.Power(new Num(j), -p)));
-                return zeta - head;
-            }
+            var p = -pe;
+            if (p.IsOne) return Expr.Infinity;
+            double pv = p.IsConstant ? NumericEval.EvalReal(p) : double.NaN;
+            if (p.IsConstant && !(pv > 1)) return pv <= 1 ? Expr.Infinity : FnExpr.Inert("sum", f, k, a, Expr.Infinity);
+            var zeta = p is Num { Value.IsInteger: true } pi && pi.Value.Num <= 30 && pi.Value.Num.IsEven ? Zeta((int)pi.Value.Num) : Expr.Call("zeta", p);
+            var head = Expr.Plus(Enumerable.Range(1, (int)first.Value.Num - 1).Select(j => Expr.Power(new Num(j), -p)));
+            return zeta - head;
         }
 
         // Telescoping rational sums via partial fractions.
@@ -280,17 +280,21 @@ public static class Sums
         return new Num(coef) * Expr.Power(Expr.Pi, p);
     }
 
+    private static readonly List<BigRational> BernoulliTable = [BigRational.One];
+
+    /// <summary>Bernoulli number B_n (B_1 = −1/2), from a cached table grown on demand.</summary>
     public static BigRational Bernoulli(int n)
     {
-        var B = new BigRational[n + 1];
-        B[0] = BigRational.One;
-        for (int m = 1; m <= n; m++)
+        lock (BernoulliTable)
         {
-            var s = BigRational.Zero;
-            for (int j = 0; j < m; j++) s += new BigRational(IntMath.Binomial(m + 1, j)) * B[j];
-            B[m] = -s / (m + 1);
+            for (int m = BernoulliTable.Count; m <= n; m++)
+            {
+                var s = BigRational.Zero;
+                for (int j = 0; j < m; j++) s += new BigRational(IntMath.Binomial(m + 1, j)) * BernoulliTable[j];
+                BernoulliTable.Add(-s / (m + 1));
+            }
+            return BernoulliTable[n];
         }
-        return B[n];
     }
 
     public static Expr Product(Expr f, Expr k, Expr a, Expr b)

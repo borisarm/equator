@@ -382,7 +382,13 @@ public sealed class Parser
     private static Expr ParseNumber(string text)
     {
         if (text.Contains('.') || text.Contains('e') || text.Contains('E'))
+        {
+            // More significant digits than a double holds: keep them all as an arbitrary-precision number.
+            var mantissa = text.Split('e', 'E')[0].Replace(".", "").TrimStart('0');
+            if (mantissa.Length > 17)
+                return new Real(Numerics.BigFloat.Parse(text, Numerics.BigFloat.DigitsToBits(mantissa.Length) + 16), mantissa.Length);
             return new Real(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture));
+        }
         return new Num(BigInteger.Parse(text, CultureInfo.InvariantCulture));
     }
 }

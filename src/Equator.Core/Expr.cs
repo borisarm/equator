@@ -51,8 +51,8 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
 
     // ---- classification helpers ----------------------------------------------------------
     public bool IsNumber => this is Num or Real;
-    public bool IsZero => this is Num { Value.IsZero: true } || this is Real { Value: 0.0 };
-    public bool IsOne => this is Num { Value.IsOne: true } || this is Real { Value: 1.0 };
+    public bool IsZero => this is Num { Value.IsZero: true } || (this is Real r && (r.Big is { } b ? b.IsZero : r.Value == 0.0));
+    public bool IsOne => this is Num { Value.IsOne: true } || (this is Real r && (r.Big is { } b ? b.Mantissa.IsOne && b.Exponent == 0 : r.Value == 1.0));
     public bool IsInteger => this is Num { Value.IsInteger: true };
     public bool IsNegativeNumber => this is Num n ? n.Value.Sign < 0 : this is Real r && r.Value < 0;
     public bool IsInfinite => this == Infinity || this == ComplexInfinity || (this is MulExpr m && m.Factors.Count == 2 && m.Factors[0].IsNumber && m.Factors[1] == Infinity);
@@ -216,9 +216,9 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
     public static Expr Plus(IEnumerable<Expr> items)
     {
         BigRational q = BigRational.Zero;
-        double? r = null;
+        Approx? r = null;
         var order = new List<Expr>();
-        var coeffs = new Dictionary<Expr, (BigRational q, double? r)>();
+        var coeffs = new Dictionary<Expr, (BigRational q, Approx? r)>();
         List<ListExpr>? lists = null;
         int posInf = 0, negInf = 0, cInf = 0;
 
@@ -230,7 +230,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                     foreach (var s in a.Terms) Accumulate(s);
                     return;
                 case Num n: q += n.Value; return;
-                case Real re: r = (r ?? 0) + re.Value; return;
+                case Real re: r = r is { } r0 ? r0.Add(Approx.Of(re)) : Approx.Of(re); return;
                 case ListExpr l: (lists ??= []).Add(l); return;
             }
             if (t == Undefined) { cInf = -1000; return; }
@@ -243,7 +243,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                 return;
             }
             if (!coeffs.TryGetValue(rest, out var acc)) { order.Add(rest); acc = (BigRational.Zero, null); }
-            coeffs[rest] = c is Num cn ? (acc.q + cn.Value, acc.r) : (acc.q, (acc.r ?? 0) + ((Real)c).Value);
+            coeffs[rest] = c is Num cn ? (acc.q + cn.Value, acc.r) : (acc.q, acc.r is { } ar ? ar.Add(Approx.Of((Real)c)) : Approx.Of((Real)c));
         }
 
         foreach (var item in items) Accumulate(item);
@@ -257,12 +257,12 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
         foreach (var key in order)
         {
             var (cq, cr) = coeffs[key];
-            Expr coeff = cr.HasValue ? new Real(cq.ToDouble() + cr.Value) : new Num(cq);
+            Expr coeff = cr is { } crv ? crv.AddRational(cq).ToReal() : new Num(cq);
             if (coeff is Num { Value.IsZero: true }) continue;
-            if (coeff is Real { Value: 0.0 } && cq.IsZero) continue;
+            if (coeff is Real && coeff.IsZero && cq.IsZero) continue;
             terms.Add(MakeTerm(coeff, key));
         }
-        Expr constant = r.HasValue ? new Real(q.ToDouble() + r.Value) : new Num(q);
+        Expr constant = r is { } rv ? rv.AddRational(q).ToReal() : new Num(q);
 
         if (lists is not null)
         {
@@ -298,7 +298,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
     public static Expr Times(IEnumerable<Expr> items)
     {
         BigRational q = BigRational.One;
-        double? r = null;
+        Approx? r = null;
         bool zero = false, undefined = false;
         var order = new List<Expr>();
         var exps = new Dictionary<Expr, List<Expr>>();
@@ -316,8 +316,8 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                     if (n.Value.IsZero) zero = true; else q *= n.Value;
                     return;
                 case Real re:
-                    if (re.Value == 0) zero = true;
-                    r = (r ?? 1) * re.Value;
+                    if (re.IsZero) zero = true;
+                    r = r is { } r0 ? r0.Mul(Approx.Of(re)) : Approx.Of(re);
                     return;
                 case ListExpr l: (lists ??= []).Add(l); return;
             }
@@ -351,7 +351,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                 case Num n:
                     if (n.Value.IsZero) zero = true; else q *= n.Value;
                     break;
-                case Real re: r = (r ?? 1) * re.Value; break;
+                case Real re: r = r is { } r1 ? r1.Mul(Approx.Of(re)) : Approx.Of(re); break;
                 case MulExpr m:
                     foreach (var g in m.Factors) AddFactor(g);
                     break;
@@ -379,13 +379,13 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                 if (v < 0) q = -q;
                 factors.RemoveAt(i);
             }
-            double sign = Math.Sign(q.ToDouble() * (r ?? 1));
+            double sign = q.Sign * (r is { } rs ? rs.Sign : 1);
             q = sign < 0 ? BigRational.MinusOne : BigRational.One;
             r = null;
             if (factors.Contains(ComplexInfinity)) { q = BigRational.One; factors.RemoveAll(f => f == Infinity); }
         }
 
-        Expr coeff = r.HasValue ? new Real(q.ToDouble() * r.Value) : new Num(q);
+        Expr coeff = r is { } rc ? rc.MulRational(q).ToReal() : new Num(q);
 
         if (lists is not null)
         {
@@ -556,6 +556,19 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
 
     private static Expr NumericPower(Expr b, Expr e)
     {
+        // Arbitrary-precision operands (and no machine reals): evaluate at their precision.
+        bool anyMachine = b.ContainsAny(z => z is Real { IsMachine: true }) || e.ContainsAny(z => z is Real { IsMachine: true });
+        var precB = Numerics.BigEval.PrecisionOf(b);
+        var precE = Numerics.BigEval.PrecisionOf(e);
+        if (!anyMachine && (precB is not null || precE is not null))
+        {
+            int digits = Math.Min(precB ?? int.MaxValue, precE ?? int.MaxValue);
+            int bits = Numerics.BigFloat.DigitsToBits(digits) + 16;
+            var bb = Numerics.BigEval.Eval(b, bits);
+            if (e is Num { Value.IsInteger: true } ni && System.Numerics.BigInteger.Abs(ni.Value.Num) < 1_000_000)
+                return Numerics.BigEval.ToExpr(Numerics.BigEval.IntPow(bb, (int)ni.Value.Num, bits), digits);
+            return Numerics.BigEval.ToExpr(Numerics.BigEval.Pow(bb, Numerics.BigEval.Eval(e, bits), bits), digits);
+        }
         var cb = Numerics.NumericEval.Eval(b);
         var ce = Numerics.NumericEval.Eval(e);
         if (cb.Imaginary == 0 && ce.Imaginary == 0 && (cb.Real >= 0 || Math.Abs(ce.Real - Math.Round(ce.Real)) < 1e-15))
@@ -632,12 +645,86 @@ public sealed class Num(BigRational value) : Expr
     protected override bool StructEquals(Expr other) => ((Num)other).Value == Value;
 }
 
-public sealed class Real(double value) : Expr
+/// <summary>
+/// Approximate real number: a machine double, or an arbitrary-precision <see cref="Numerics.BigFloat"/> that
+/// carries its precision in decimal digits. Arithmetic mixing the two falls back to machine precision;
+/// arbitrary-precision operands combine at the smaller precision.
+/// </summary>
+public sealed class Real : Expr
 {
-    public double Value { get; } = value;
+    public Real(double value) { Value = value; }
+
+    public Real(Numerics.BigFloat big, int digits)
+    {
+        Big = big;
+        Digits = Math.Max(digits, 1);
+        Value = big.ToDouble();
+    }
+
+    /// <summary>Machine approximation (always available).</summary>
+    public double Value { get; }
+    /// <summary>The arbitrary-precision value, or null for machine numbers.</summary>
+    public Numerics.BigFloat? Big { get; }
+    /// <summary>Significant decimal digits of an arbitrary-precision number (0 for machine numbers).</summary>
+    public int Digits { get; }
+    public bool IsMachine => Big is null;
+
     internal override int Rank => 0;
-    protected override int ComputeHash() => HashCode.Combine(7, Value);
-    protected override bool StructEquals(Expr other) => ((Real)other).Value.Equals(Value);
+    protected override int ComputeHash() => Big is { } b ? HashCode.Combine(7, b, Digits) : HashCode.Combine(7, Value);
+
+    protected override bool StructEquals(Expr other)
+    {
+        var o = (Real)other;
+        if (Big is { } a) return o.Big is { } b && a.Equals(b) && Digits == o.Digits;
+        return o.Big is null && o.Value.Equals(Value);
+    }
+}
+
+/// <summary>Accumulates approximate numbers for the canonical constructors, tracking precision.</summary>
+internal readonly struct Approx
+{
+    public readonly double D;
+    public readonly Numerics.BigFloat? B;
+    public readonly int Digits;
+
+    private Approx(double d, Numerics.BigFloat? b, int digits) { D = d; B = b; Digits = digits; }
+
+    public static Approx Of(Real r) => r.Big is { } b ? new(r.Value, b, r.Digits) : new(r.Value, null, 0);
+    public static Approx Machine(double d) => new(d, null, 0);
+
+    private static int Bits(int digits) => Numerics.BigFloat.DigitsToBits(digits) + 16;
+
+    public Approx Add(Approx o)
+    {
+        if (B is { } a && o.B is { } b)
+        {
+            int digits = Math.Min(Digits, o.Digits);
+            return new Approx(0, Numerics.BigFloat.Add(a, b, Bits(digits)), digits).WithDouble();
+        }
+        return Machine(D + o.D);
+    }
+
+    public Approx Mul(Approx o)
+    {
+        if (B is { } a && o.B is { } b)
+        {
+            int digits = Math.Min(Digits, o.Digits);
+            return new Approx(0, (a * b).WithPrecision(Bits(digits)), digits).WithDouble();
+        }
+        return Machine(D * o.D);
+    }
+
+    public Approx AddRational(BigRational q) =>
+        B is { } a ? new Approx(0, Numerics.BigFloat.Add(a, Numerics.BigFloat.FromRational(q, Bits(Digits)), Bits(Digits)), Digits).WithDouble() : Machine(D + q.ToDouble());
+
+    public Approx MulRational(BigRational q) =>
+        B is { } a ? new Approx(0, (a * Numerics.BigFloat.FromRational(q, Bits(Digits))).WithPrecision(Bits(Digits)), Digits).WithDouble() : Machine(D * q.ToDouble());
+
+    private Approx WithDouble() => new(B!.Value.ToDouble(), B, Digits);
+
+    public bool IsZero => B is { } b ? b.IsZero : D == 0;
+    public int Sign => B is { } b ? b.Sign : Math.Sign(D);
+    public Real ToReal() => B is { } b ? new Real(b, Digits) : new Real(D);
 }
 
 public sealed class Sym(string name) : Expr

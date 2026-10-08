@@ -37,7 +37,7 @@ public static class Limits
 
         var r = Lim(f, x, a, dir, 0);
         if (r is not null && r != Expr.Undefined && r != Expr.ComplexInfinity) return Clean(r);
-        var n = NumericLimit(f, x, a, dir);
+        var n = HighPrecisionLimit(f, x, a, dir) ?? NumericLimit(f, x, a, dir);
         if (n is not null) return n;
         return r ?? FnExpr.Inert("limit", f, x, a);
     }
@@ -105,7 +105,11 @@ public static class Limits
                         var prod = Expr.Times(parts);
                         if (!Indeterminate(prod)) return prod;
                     }
-                    return Quotient(f, x, a, dir, depth) ?? ViaLogarithm(m, x, a, dir, depth);
+                    // Variable exponents and factorials: logarithms first (L'Hôpital only makes them grow).
+                    bool growthForm = m.Factors.Any(z => z is PowExpr pz && !pz.Exponent.FreeOf(x) || z is FnExpr { Name: "factorial" or "gamma" });
+                    return growthForm
+                        ? ViaLogarithm(m, x, a, dir, depth) ?? Quotient(f, x, a, dir, depth)
+                        : Quotient(f, x, a, dir, depth) ?? ViaLogarithm(m, x, a, dir, depth);
                 }
             case PowExpr p:
                 {
@@ -376,6 +380,8 @@ public static class Limits
                 var q = ln / ld;
                 return Indeterminate(q) ? null : q;
             }
+            // Repeated differentiation can make expressions explode: give up beyond a size budget.
+            if (n.Complexity() + d.Complexity() > 600) return null;
             n = Rational.Cancel(Derivative.Diff(n, x));
             d = Rational.Cancel(Derivative.Diff(d, x));
             // Cancel the new quotient before the next round to avoid growth.
@@ -416,7 +422,51 @@ public static class Limits
         catch (MathException) { return 0; }
     }
 
-    // ---- numeric fallback ------------------------------------------------------------------------
+    // ---- numeric fallbacks -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Evaluates f at a ± 10^-15, 10^-25, 10^-35 with 150-digit arithmetic, so that cancellation does not
+    /// matter. A converged value is identified as an exact constant by PSLQ when possible (agreement to about
+    /// 25 digits is required); a clearly growing sequence gives ±∞.
+    /// </summary>
+    private static Expr? HighPrecisionLimit(Expr f, Expr x, Expr a, int dir)
+    {
+        if (!f.FreeSymbols().All(s => s == x) || !a.IsConstant || a.IsUndefinedOrInfinite) return null;
+        const int digits = 150;
+        int bits = BigFloat.DigitsToBits(digits);
+        try
+        {
+            var av = BigEval.Eval(a, bits);
+            if (!av.IsReal) return null;
+            var scale = av.Re.Abs().CompareTo(BigFloat.FromInteger(1, bits)) > 0 ? av.Re.Abs() : BigFloat.FromInteger(1, bits);
+            var values = new List<BigFloat>();
+            foreach (var k in new[] { 15, 25, 35 })
+            {
+                var h = BigFloat.FromRational(new BigRational(1, System.Numerics.BigInteger.Pow(10, k)), bits) * scale;
+                var point = dir > 0 ? av.Re + h : av.Re - h;
+                var v = BigEval.Eval(f, bits, new Dictionary<string, BigComplex> { [((Sym)x).Name] = BigComplex.Real(point) });
+                if (!v.IsReal && !v.Im.IsZero && v.Im.Log2Magnitude > v.Re.Log2Magnitude - bits / 2) return null;
+                values.Add(v.Re);
+            }
+            var (v1, v2, v3) = (values[0], values[1], values[2]);
+            // Divergence: the magnitude grows by many orders at each step with a stable sign.
+            if (!v3.IsZero && !v2.IsZero && v3.Log2Magnitude > 60 && v3.Log2Magnitude - v2.Log2Magnitude > 15
+                && v2.Log2Magnitude - v1.Log2Magnitude > 15 && v1.Sign == v2.Sign && v2.Sign == v3.Sign)
+                return v3.Sign > 0 ? Expr.Infinity : -Expr.Infinity;
+            var d32 = (v3 - v2).Abs();
+            var d21 = (v2 - v1).Abs();
+            long mag = Math.Max(0, v3.IsZero ? 0 : v3.Log2Magnitude);
+            // Converged: successive differences tiny (relative 10^-20 and shrinking).
+            if (!(d32.IsZero || d32.Log2Magnitude < mag - 66) || !(d21.IsZero || d32.IsZero || d32.Log2Magnitude < d21.Log2Magnitude - 10))
+                return null;
+            var exact = Identify.Constant(v3, 30);
+            if (exact is not null) return exact;
+            return new Real(v3.ToDouble());
+        }
+        catch (MathException) { return null; }
+        catch (DivideByZeroException) { return null; }
+        catch (OverflowException) { return null; }
+    }
 
     private static Expr? NumericLimit(Expr f, Expr x, Expr a, int dir)
     {
