@@ -40,7 +40,7 @@ public sealed class KernelHost : IDisposable
             catch (Exception ex)
             {
                 // Last-resort guard: an engine bug must not take down the notebook.
-                tcs.SetResult(new EvaluationResult(Kernel.ExecutionCount, [new CellOutput(OutputKind.Error, "Internal error: " + ex.Message)], TimeSpan.Zero));
+                tcs.SetResult(new EvaluationResult(Kernel.ExecutionCount, [new CellOutput(OutputKind.Error, Localization.Loc.Format("error.internal", ex.Message))], TimeSpan.Zero));
             }
             finally
             {

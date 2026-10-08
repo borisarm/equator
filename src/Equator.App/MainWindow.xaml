@@ -3,6 +3,7 @@
     x:Class="Equator.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:l="using:Equator.App.Localization"
     Title="Equator">
 
     <Window.SystemBackdrop>
@@ -29,61 +30,67 @@
         </Grid.KeyboardAccelerators>
 
         <!-- Title bar -->
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="14,0,0,0">
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="14,0,0,0" FlowDirection="LeftToRight">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                 <Border Width="22" Height="22" CornerRadius="5" Background="{ThemeResource AccentFillColorDefaultBrush}">
                     <TextBlock Text="∫" FontFamily="Cambria Math" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"
                                Margin="0,-2,0,0" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
                 </Border>
                 <TextBlock Text="Equator" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-                <TextBlock x:Name="DocumentTitle" Text="Untitled" VerticalAlignment="Center"
+                <TextBlock x:Name="DocumentTitle" VerticalAlignment="Center"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
         </Grid>
 
         <!-- Commands -->
         <CommandBar Grid.Row="1" HorizontalAlignment="Left" DefaultLabelPosition="Right" Margin="4,0,0,2" Background="Transparent">
-            <AppBarButton Label="New" Click="New_Click" ToolTipService.ToolTip="New notebook (Ctrl+N)">
+            <AppBarButton l:Tr.Text="tb.new" l:Tr.ToolTip="tb.new.tip" Click="New_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE8A5;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Open" Click="Open_Click" ToolTipService.ToolTip="Open notebook (Ctrl+O)">
+            <AppBarButton l:Tr.Text="tb.open" l:Tr.ToolTip="tb.open.tip" Click="Open_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE8E5;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save notebook (Ctrl+S)">
+            <AppBarButton l:Tr.Text="tb.save" l:Tr.ToolTip="tb.save.tip" Click="Save_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE74E;" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
-            <AppBarButton Label="Run all" Click="EvaluateAll_Click" ToolTipService.ToolTip="Run every cell from the top (F5)">
+            <AppBarButton l:Tr.Text="tb.runAll" l:Tr.ToolTip="tb.runAll.tip" Click="EvaluateAll_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton x:Name="AbortButton" Label="Stop" Click="Abort_Click" IsEnabled="False" ToolTipService.ToolTip="Stop the running calculation (Ctrl+Esc)">
+            <AppBarButton x:Name="AbortButton" l:Tr.Text="tb.stop" l:Tr.ToolTip="tb.stop.tip" Click="Abort_Click" IsEnabled="False">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE71A;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Clear results" Click="ClearOutputs_Click">
+            <AppBarButton l:Tr.Text="tb.clear" Click="ClearOutputs_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE894;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Reset session" Click="Restart_Click" ToolTipService.ToolTip="Forget all variables, functions, assumptions and results">
+            <AppBarButton l:Tr.Text="tb.reset" l:Tr.ToolTip="tb.reset.tip" Click="Restart_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
-            <AppBarButton Label="Add cell" Click="AddCell_Click">
+            <AppBarButton l:Tr.Text="tb.addCell" Click="AddCell_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
             </AppBarButton>
             <CommandBar.SecondaryCommands>
-                <AppBarButton Label="Zoom in" Click="ZoomIn_Click">
+                <AppBarButton l:Tr.Text="tb.zoomIn" Click="ZoomIn_Click">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE8A3;" /></AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton Label="Zoom out" Click="ZoomOut_Click">
+                <AppBarButton l:Tr.Text="tb.zoomOut" Click="ZoomOut_Click">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE71F;" /></AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton Label="Toggle light/dark theme" Click="Theme_Click">
+                <AppBarButton l:Tr.Text="tb.theme" Click="Theme_Click">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE793;" /></AppBarButton.Icon>
                 </AppBarButton>
+                <AppBarButton l:Tr.Text="tb.language">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xF2B7;" /></AppBarButton.Icon>
+                    <AppBarButton.Flyout>
+                        <MenuFlyout x:Name="LanguageMenu" Placement="LeftEdgeAlignedTop" />
+                    </AppBarButton.Flyout>
+                </AppBarButton>
                 <AppBarSeparator />
-                <AppBarButton Label="Load examples" Click="Examples_Click">
+                <AppBarButton l:Tr.Text="tb.examples" Click="Examples_Click">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
                 </AppBarButton>
-                <AppBarButton Label="Keyboard shortcuts" Click="Help_Click">
+                <AppBarButton l:Tr.Text="tb.shortcuts" Click="Help_Click">
                     <AppBarButton.Icon><FontIcon Glyph="&#xE765;" /></AppBarButton.Icon>
                 </AppBarButton>
             </CommandBar.SecondaryCommands>
@@ -110,9 +117,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <SelectorBar x:Name="SidePanelSelector" SelectionChanged="SidePanelSelector_SelectionChanged">
-                    <SelectorBarItem x:Name="FunctionsTab" Text="Functions" IsSelected="True" />
-                    <SelectorBarItem x:Name="VariablesTab" Text="Variables" />
-                    <SelectorBarItem x:Name="GuideTab" Text="Guide" />
+                    <SelectorBarItem x:Name="FunctionsTab" l:Tr.Text="side.functions" IsSelected="True" />
+                    <SelectorBarItem x:Name="VariablesTab" l:Tr.Text="side.variables" />
+                    <SelectorBarItem x:Name="GuideTab" l:Tr.Text="side.guide" />
                 </SelectorBar>
 
                 <Grid x:Name="FunctionsPanel" Grid.Row="1">
@@ -122,9 +129,9 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="Symbols" Style="{StaticResource PanelHeader}" />
-                    <StackPanel x:Name="SymbolsPanel" Grid.Row="1" Spacing="4" />
-                    <AutoSuggestBox x:Name="FunctionSearch" Grid.Row="2" Margin="0,14,0,8" PlaceholderText="Search functions"
+                    <TextBlock l:Tr.Text="side.symbols" Style="{StaticResource PanelHeader}" />
+                    <StackPanel x:Name="SymbolsPanel" Grid.Row="1" Spacing="4" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                    <AutoSuggestBox x:Name="FunctionSearch" Grid.Row="2" Margin="0,14,0,8" l:Tr.Text="side.search"
                                     QueryIcon="Find" TextChanged="FunctionSearch_TextChanged" />
                     <ListView x:Name="FunctionList" Grid.Row="3" SelectionMode="None" IsItemClickEnabled="True"
                               ItemClick="FunctionList_ItemClick" Padding="0,0,0,12" />
@@ -135,7 +142,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="Defined in this session" Style="{StaticResource PanelHeader}" />
+                    <TextBlock l:Tr.Text="side.defined" Style="{StaticResource PanelHeader}" />
                     <ListView x:Name="VariableList" Grid.Row="1" SelectionMode="None" />
                 </Grid>
 
@@ -150,10 +157,10 @@
               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" />
-                <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Name="StatusText" l:Tr.Text="status.ready" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <TextBlock x:Name="StatusRight" HorizontalAlignment="Right" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                       Text="Shift+Enter run · Alt+Enter run and add a cell · ↑/↓ move between cells · %n refers to step n" />
+                       l:Tr.Text="status.hints" />
         </Grid>
     </Grid>
 </Window>

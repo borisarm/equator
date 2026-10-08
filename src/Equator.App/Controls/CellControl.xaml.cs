@@ -1,4 +1,5 @@
 using System.Globalization;
+using Equator.App.Localization;
 using Equator.Core.Engine;
 using Equator.Core.Printing;
 using Microsoft.UI.Input;
@@ -56,6 +57,15 @@ public sealed partial class CellControl : UserControl
     public void Rerender(double mathSize)
     {
         if (_lastResult is not null && HasOutput) ShowResult(_lastResult, mathSize);
+    }
+
+    private double _mathSize = 19;
+
+    /// <summary>Refreshes the text built in code (badge tooltip, result panels) after a language change.</summary>
+    public void Relocalize()
+    {
+        if (_lastResult is not null && HasOutput) ShowResult(_lastResult, _mathSize);
+        else if (_badge != BadgeState.Running) SetBadge(_badge);
     }
 
     public void FocusInput(bool atEnd = true)
@@ -117,10 +127,10 @@ public sealed partial class CellControl : UserControl
         BadgeText.FontSize = state == BadgeState.Done && step >= 100 ? 10 : state == BadgeState.Error ? 13 : 12;
         ToolTipService.SetToolTip(Badge, state switch
         {
-            BadgeState.Done => $"Step {step}: refer to its result as %{step}",
-            BadgeState.Error => "This step has an error",
-            BadgeState.Running => "Running",
-            _ => "Not run yet",
+            BadgeState.Done => Loc.Format("badge.done", step),
+            BadgeState.Error => Loc.Get("badge.error"),
+            BadgeState.Running => Loc.Get("badge.running"),
+            _ => Loc.Get("badge.pending"),
         });
     }
 
@@ -129,6 +139,7 @@ public sealed partial class CellControl : UserControl
     public void ShowResult(EvaluationResult result, double mathSize)
     {
         _lastResult = result;
+        _mathSize = mathSize;
         Outputs.Children.Clear();
         bool failed = result.Outputs.Any(o => o.Kind == OutputKind.Error);
         SetBadge(failed ? BadgeState.Error : BadgeState.Done, result.Index);
@@ -189,8 +200,8 @@ public sealed partial class CellControl : UserControl
                 CornerRadius = new CornerRadius(10),
                 HorizontalAlignment = HorizontalAlignment.Right,
             };
-            ToolTipService.SetToolTip(chip, $"Insert {refText} (this result) into the current cell");
-            AutomationProperties.SetName(chip, $"Insert reference {refText}");
+            ToolTipService.SetToolTip(chip, Loc.Format("chip.tip", refText));
+            AutomationProperties.SetName(chip, Loc.Format("chip.name", refText));
             chip.Click += (_, _) => ReferenceRequested?.Invoke(this, refText);
             side.Children.Add(chip);
         }
@@ -229,11 +240,11 @@ public sealed partial class CellControl : UserControl
         };
 
         var menu = new MenuFlyout();
-        AddItem(menu, "Copy as text", "", () => CopyText(output.Text));
-        if (output.Latex is not null) AddItem(menu, "Copy as LaTeX", "", () => CopyText(output.Latex));
-        if (view is not null) AddItem(menu, "Copy as image", "", async () => CopyImage(await view.RenderPngAsync()));
+        AddItem(menu, Loc.Get("menu.copyText"), "", () => CopyText(output.Text));
+        if (output.Latex is not null) AddItem(menu, Loc.Get("menu.copyLatex"), "", () => CopyText(output.Latex));
+        if (view is not null) AddItem(menu, Loc.Get("menu.copyImage"), "", async () => CopyImage(await view.RenderPngAsync()));
         menu.Items.Add(new MenuFlyoutSeparator());
-        AddItem(menu, "Use as new input", "", () => UseAsInput?.Invoke(this, output.Text));
+        AddItem(menu, Loc.Get("menu.useAsInput"), "", () => UseAsInput?.Invoke(this, output.Text));
         scroller.ContextFlyout = menu;
         ToolTipService.SetToolTip(scroller, output.Text.Length > 300 ? output.Text[..300] + "…" : output.Text);
         return scroller;
@@ -247,13 +258,13 @@ public sealed partial class CellControl : UserControl
         if (spec.Kind == PlotKind.Surface)
         {
             var s = new SurfaceView(spec);
-            AddItem(menu, "Copy image", "", async () => CopyImage(await s.RenderPngAsync(ActualTheme == ElementTheme.Dark)));
+            AddItem(menu, Loc.Get("menu.copyPlot"), "", async () => CopyImage(await s.RenderPngAsync(ActualTheme == ElementTheme.Dark)));
             view = s;
         }
         else
         {
             var p = new PlotView(spec);
-            AddItem(menu, "Copy image", "", async () => CopyImage(await p.RenderPngAsync(ActualTheme == ElementTheme.Dark)));
+            AddItem(menu, Loc.Get("menu.copyPlot"), "", async () => CopyImage(await p.RenderPngAsync(ActualTheme == ElementTheme.Dark)));
             view = p;
         }
         view.ContextFlyout = menu;

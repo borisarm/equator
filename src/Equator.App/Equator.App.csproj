@@ -53,6 +53,10 @@
   <ItemGroup>
     <Content Include="Assets\Equator.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- Interface strings, one table per language (see Localization/Loc.cs). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Strings\*.json" LogicalName="Strings.%(Filename).json" />
+  </ItemGroup>
   <ItemGroup Condition="'$(EquatorPackaged)' == 'true'">
     <AppxManifest Include="Package.appxmanifest" SubType="Designer" />
     <Content Include="Assets\Package\*.png" />

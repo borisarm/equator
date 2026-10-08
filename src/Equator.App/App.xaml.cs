@@ -33,6 +33,7 @@ public partial class App : Application
     {
         try
         {
+            Localization.Loc.Initialize();
             _window = new MainWindow();
             _window.Activate();
         }

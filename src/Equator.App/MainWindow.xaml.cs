@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Equator.App.Controls;
+using Equator.App.Localization;
 using Equator.App.Services;
 using Equator.Core.Engine;
 using Equator.Core.Printing;
@@ -36,9 +37,9 @@ public sealed partial class MainWindow : Window
 
         _host.Kernel.EnvironmentChanged += OnEnvironmentChanged;
         BuildSymbolPalette();
-        BuildFunctionList("");
-        BuildGuide();
-        RefreshVariables([]);
+        BuildLanguageMenu();
+        ApplyLanguage();
+        Loc.Changed += (_, _) => ApplyLanguage();
 
         if (StartupFile() is { } startupFile) _ = OpenPathAsync(startupFile, evaluate: true);
         else LoadCells(Examples.Welcome, evaluate: true);
@@ -247,7 +248,7 @@ public sealed partial class MainWindow : Window
             cell.SetBusy(false);
             cell.ShowResult(result, MathSize);
             bool failed = result.Outputs.Any(o => o.Kind == OutputKind.Error);
-            SetStatus(failed ? $"Step {result.Index} has an error" : $"Step {result.Index} done in {FormatTime(result.Elapsed)}", failed);
+            SetStatus(failed ? Loc.Format("status.stepError", result.Index) : Loc.Format("status.stepDone", result.Index, FormatTime(result.Elapsed)), failed);
         }
         finally
         {
@@ -266,7 +267,7 @@ public sealed partial class MainWindow : Window
         _running++;
         AbortButton.IsEnabled = true;
         StatusDot.Fill = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
-        StatusText.Text = "Running…";
+        StatusText.Text = Loc.Get("status.running");
     }
 
     private void EndRunning()
@@ -320,7 +321,7 @@ public sealed partial class MainWindow : Window
                 var b = new Button { Content = sym, Style = (Style)Application.Current.Resources["SymbolButton"] };
                 if (sym.Length > 1) b.FontFamily = new FontFamily("Cascadia Mono, Consolas");
                 b.Click += (_, _) => InsertIntoActive(SymbolInsert.GetValueOrDefault(sym, sym));
-                ToolTipService.SetToolTip(b, "Insert " + SymbolInsert.GetValueOrDefault(sym, sym).Trim());
+                ToolTipService.SetToolTip(b, Loc.Format("side.insertSymbol", SymbolInsert.GetValueOrDefault(sym, sym).Trim()));
                 panel.Children.Add(b);
             }
             SymbolsPanel.Children.Add(panel);
@@ -339,24 +340,26 @@ public sealed partial class MainWindow : Window
         string? category = null;
         foreach (var b in Builtins.All)
         {
+            var description = Loc.GetOr("fn." + b.Name, b.Description);
             if (filter.Length > 0 && !b.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) &&
+                !description.Contains(filter, StringComparison.CurrentCultureIgnoreCase) &&
                 !b.Description.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
             if (b.Category != category)
             {
                 category = b.Category;
                 FunctionList.Items.Add(new ListViewItem
                 {
-                    Content = new TextBlock { Text = category.ToUpperInvariant(), FontSize = 11, CharacterSpacing = 60, Style = (Style)Application.Current.Resources["AccentText"] },
+                    Content = new TextBlock { Text = Loc.GetOr("cat." + category, category).ToUpper(CultureInfo.CurrentCulture), FontSize = 11, CharacterSpacing = 60, Style = (Style)Application.Current.Resources["AccentText"] },
                     IsEnabled = false,
                     MinHeight = 28,
                     Padding = new Thickness(12, 10, 0, 2),
                 });
             }
             var panel = new StackPanel { Padding = new Thickness(0, 6, 0, 6), Spacing = 1, Tag = b };
-            panel.Children.Add(new TextBlock { Text = b.Usage, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap });
-            panel.Children.Add(new TextBlock { Text = b.Description, FontSize = 12, TextWrapping = TextWrapping.Wrap, Style = (Style)Application.Current.Resources["SecondaryText"] });
+            panel.Children.Add(new TextBlock { Text = b.Usage, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = Loc.IsRightToLeft ? HorizontalAlignment.Right : HorizontalAlignment.Left });
+            panel.Children.Add(new TextBlock { Text = description, FontSize = 12, TextWrapping = TextWrapping.Wrap, Style = (Style)Application.Current.Resources["SecondaryText"] });
             var item = new ListViewItem { Content = panel, Tag = b };
-            ToolTipService.SetToolTip(item, "Click to insert: " + b.Example);
+            ToolTipService.SetToolTip(item, Loc.Format("side.insertExample", b.Example));
             FunctionList.Items.Add(item);
         }
     }
@@ -408,14 +411,17 @@ public sealed partial class MainWindow : Window
 
     private static string Shorten(string s) => s.Length > 160 ? s[..160] + "…" : s;
 
+    private List<(string Name, string Value)> _variables = [];
+
     private void RefreshVariables(List<(string Name, string Value)> items)
     {
+        _variables = items;
         VariableList.Items.Clear();
         if (items.Count == 0)
         {
             VariableList.Items.Add(new TextBlock
             {
-                Text = "Nothing defined yet. Assign with  a := 2  or define functions with  f(x) := x^2.",
+                Text = Loc.Get("side.nothing"),
                 TextWrapping = TextWrapping.Wrap,
                 Style = (Style)Application.Current.Resources["SecondaryText"],
                 Margin = new Thickness(0, 8, 0, 0),
@@ -424,7 +430,7 @@ public sealed partial class MainWindow : Window
         }
         foreach (var (name, value) in items)
         {
-            var panel = new StackPanel { Padding = new Thickness(0, 6, 0, 6) };
+            var panel = new StackPanel { Padding = new Thickness(0, 6, 0, 6), FlowDirection = FlowDirection.LeftToRight };
             panel.Children.Add(new TextBlock { Text = name, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = value, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12, TextWrapping = TextWrapping.Wrap, Style = (Style)Application.Current.Resources["SecondaryText"] });
             VariableList.Items.Add(panel);
@@ -433,8 +439,11 @@ public sealed partial class MainWindow : Window
 
     private void BuildGuide()
     {
-        foreach (var (title, body, examples) in Examples.Guide)
+        GuideContent.Children.Clear();
+        foreach (var (id, examples) in Examples.Guide)
         {
+            var title = Loc.Get($"guide.{id}.title");
+            var body = Loc.Get($"guide.{id}.body");
             GuideContent.Children.Add(new TextBlock { Text = title, Style = (Style)Application.Current.Resources["PanelHeader"] });
             if (body.Length > 0)
                 GuideContent.Children.Add(new TextBlock { Text = body, TextWrapping = TextWrapping.Wrap, FontSize = 13, Style = (Style)Application.Current.Resources["SecondaryText"] });
@@ -442,7 +451,7 @@ public sealed partial class MainWindow : Window
             {
                 var b = new HyperlinkButton
                 {
-                    Content = new TextBlock { Text = ex, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap },
+                    Content = new TextBlock { Text = ex, FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.LeftToRight },
                     Padding = new Thickness(6, 3, 6, 3),
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Left,
@@ -464,9 +473,9 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTitle()
     {
-        var name = _filePath is null ? "Untitled" : Path.GetFileNameWithoutExtension(_filePath);
+        var name = _filePath is null ? Loc.Get("doc.untitled") : Path.GetFileNameWithoutExtension(_filePath);
         DocumentTitle.Text = name + (_dirty ? " •" : "");
-        Title = $"{name} — Equator";
+        Title = Loc.Format("window.title", name);
     }
 
     private async Task<bool> ConfirmDiscardAsync()
@@ -475,11 +484,12 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog
         {
             XamlRoot = Content.XamlRoot,
-            Title = "Save changes?",
-            Content = "The notebook has unsaved changes.",
-            PrimaryButtonText = "Save",
-            SecondaryButtonText = "Don't save",
-            CloseButtonText = "Cancel",
+            FlowDirection = RootGrid.FlowDirection,
+            Title = Loc.Get("save.title"),
+            Content = Loc.Get("save.body"),
+            PrimaryButtonText = Loc.Get("save.save"),
+            SecondaryButtonText = Loc.Get("save.dontSave"),
+            CloseButtonText = Loc.Get("save.cancel"),
             DefaultButton = ContentDialogButton.Primary,
         };
         var result = await dialog.ShowAsync();
@@ -493,7 +503,7 @@ public sealed partial class MainWindow : Window
         _filePath = null;
         await _host.RunAsync(_host.Kernel.Reset);
         LoadCells([], evaluate: false);
-        SetStatus("New notebook");
+        SetStatus(Loc.Get("status.new"));
     }
 
     private async Task OpenAsync()
@@ -519,12 +529,12 @@ public sealed partial class MainWindow : Window
             _filePath = path;
             await _host.RunAsync(_host.Kernel.Reset);
             LoadCells(inputs, evaluate);
-            if (!evaluate) SetStatus($"Opened {Path.GetFileName(path)} — press F5 to run all cells");
+            if (!evaluate) SetStatus(Loc.Format("status.opened", Path.GetFileName(path)));
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
             LoadCells([], evaluate: false);
-            SetStatus("Could not open the file: " + ex.Message, error: true);
+            SetStatus(Loc.Format("status.openFailed", ex.Message), error: true);
         }
     }
 
@@ -532,8 +542,8 @@ public sealed partial class MainWindow : Window
     {
         if (_filePath is null || saveAs)
         {
-            var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "Notebook" };
-            picker.FileTypeChoices.Add("Equator notebook", [".eqnb"]);
+            var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = Loc.Get("file.suggestedName") };
+            picker.FileTypeChoices.Add(Loc.Get("file.type"), [".eqnb"]);
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             var file = await picker.PickSaveFileAsync();
             if (file is null) return false;
@@ -544,12 +554,12 @@ public sealed partial class MainWindow : Window
             await File.WriteAllTextAsync(_filePath, NotebookFile.Serialize(Cells.Select(c => c.Text)));
             _dirty = false;
             UpdateTitle();
-            SetStatus("Saved " + Path.GetFileName(_filePath));
+            SetStatus(Loc.Format("status.saved", Path.GetFileName(_filePath)));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            SetStatus("Could not save: " + ex.Message, error: true);
+            SetStatus(Loc.Format("status.saveFailed", ex.Message), error: true);
             return false;
         }
     }
@@ -577,7 +587,7 @@ public sealed partial class MainWindow : Window
             cell.InputFontSize = BaseInputSize * _zoom;
             cell.Rerender(MathSize);
         }
-        SetStatus($"Zoom {_zoom * 100:0}%");
+        SetStatus(Loc.Format("status.zoom", Math.Round(_zoom * 100)));
     }
 
     private void ToggleTheme()
@@ -587,6 +597,38 @@ public sealed partial class MainWindow : Window
         bool dark = RootGrid.RequestedTheme == ElementTheme.Dark;
         AppWindow.TitleBar.ButtonForegroundColor = dark ? Colors.White : Colors.Black;
         AppWindow.TitleBar.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
+    }
+
+    // ---- language ------------------------------------------------------------------------------------
+
+    private void BuildLanguageMenu()
+    {
+        LanguageMenu.Items.Clear();
+        var system = new RadioMenuFlyoutItem { GroupName = "lang", Tag = "", IsChecked = Loc.Preference == "" };
+        Tr.SetText(system, "lang.system");
+        system.Click += (_, _) => Loc.SetPreference("");
+        LanguageMenu.Items.Add(system);
+        LanguageMenu.Items.Add(new MenuFlyoutSeparator());
+        foreach (var (code, nativeName) in Loc.Languages)
+        {
+            // Each language is listed under its own name, so it can be found whatever language is showing.
+            var item = new RadioMenuFlyoutItem { Text = nativeName, GroupName = "lang", Tag = code, IsChecked = Loc.Preference == code };
+            item.Click += (_, _) => Loc.SetPreference(code);
+            LanguageMenu.Items.Add(item);
+        }
+    }
+
+    /// <summary>Applies the current language to everything built in code (XAML text follows by itself).</summary>
+    private void ApplyLanguage()
+    {
+        RootGrid.FlowDirection = Loc.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        RootGrid.Language = Loc.Current;
+        BuildFunctionList(FunctionSearch.Text.Trim());
+        BuildGuide();
+        RefreshVariables(_variables);
+        UpdateTitle();
+        foreach (var cell in Cells) cell.Relocalize();
+        if (_running == 0) StatusText.Text = Loc.Get("status.ready");
     }
 
     // ---- command handlers ----------------------------------------------------------------------------
@@ -608,7 +650,7 @@ public sealed partial class MainWindow : Window
     {
         await _host.RunAsync(_host.Kernel.Reset);
         foreach (var c in Cells) c.ClearOutputs();
-        SetStatus("Session reset");
+        SetStatus(Loc.Get("status.reset"));
     }
 
     private async void Examples_Click(object sender, RoutedEventArgs e)
@@ -623,25 +665,26 @@ public sealed partial class MainWindow : Window
     {
         var text = string.Join("\n", new[]
         {
-            "Shift+Enter\tRun the cell and move to the next one",
-            "Ctrl+Enter\tRun the cell and stay",
-            "Alt+Enter\tRun the cell and add a new one below",
-            "↑ / ↓\tMove between cells (at the start/end of the input)",
-            "Ctrl+Shift+Backspace\tDelete the cell",
-            "F5\tRun all cells",
-            "Ctrl+Esc\tStop the running calculation",
-            "Ctrl+N / Ctrl+O / Ctrl+S\tNew / open / save notebook",
-            "Ctrl+Plus / Ctrl+Minus\tZoom in / out",
+            "Shift+Enter\t" + Loc.Get("keys.run"),
+            "Ctrl+Enter\t" + Loc.Get("keys.runStay"),
+            "Alt+Enter\t" + Loc.Get("keys.runAdd"),
+            "↑ / ↓\t" + Loc.Get("keys.move"),
+            "Ctrl+Shift+Backspace\t" + Loc.Get("keys.delete"),
+            "F5\t" + Loc.Get("keys.runAll"),
+            "Ctrl+Esc\t" + Loc.Get("keys.stop"),
+            "Ctrl+N / Ctrl+O / Ctrl+S\t" + Loc.Get("keys.files"),
+            "Ctrl+Plus / Ctrl+Minus\t" + Loc.Get("keys.zoom"),
             "",
-            "In plots: drag to pan, scroll to zoom (Shift: x only, Ctrl: y only), double-click to reset.",
-            "Right-click an output to copy it as text, LaTeX or an image.",
+            Loc.Get("keys.plots"),
+            Loc.Get("keys.copy"),
         });
         var dialog = new ContentDialog
         {
             XamlRoot = Content.XamlRoot,
-            Title = "Keyboard shortcuts",
+            FlowDirection = RootGrid.FlowDirection,
+            Title = Loc.Get("keys.title"),
             Content = new TextBlock { Text = text, IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap },
-            CloseButtonText = "Close",
+            CloseButtonText = Loc.Get("keys.close"),
         };
         await dialog.ShowAsync();
     }
