@@ -1,15 +1,14 @@
 # Equator
 
-A notebook-style computer algebra system for Windows, in the spirit of Mathematica, Maple and MATLAB's
-Symbolic Math Toolbox. The symbolic engine is written from scratch in C#; the front end is WinUI 3 with
-Win2D typesetting and plotting.
+A worksheet-style computer algebra system for Windows. The symbolic engine is written from scratch in C#;
+the front end is WinUI 3 with Win2D typesetting and plotting.
 
 ```
-In[1]:= integrate(x^2*sin(x), x)
-Out[1]= −x² cos(x) + 2x sin(x) + 2 cos(x)
+(1)  integrate(x^2*sin(x), x)
+     → −x² cos(x) + 2x sin(x) + 2 cos(x)                                   %1
 
-In[2]:= dsolve([y'' + y = 0, y(0) = 0, y'(0) = 1], y, x)
-Out[2]= y(x) = sin(x)
+(2)  dsolve([y'' + y = 0, y(0) = 0, y'(0) = 1], y, x)
+     → y(x) = sin(x)                                                       %2
 ```
 
 ## Features
@@ -51,12 +50,13 @@ Out[2]= y(x) = sin(x)
 
 **Notebook (`Equator.App`)**
 
-- Cells with `In[n]:=` / `Out[n]=` numbering; Shift+Enter evaluates and advances.
+- Each cell is a step: a numbered badge marks steps that have run, and the result appears in an answer panel
+  under the input, with a `%n` chip that inserts a reference to it. Shift+Enter runs a cell and moves on.
 - Native math typesetting: fractions, radicals, scripts, stretchy delimiters, matrices, ∫ ∑ lim.
 - Interactive 2D plots (pan, zoom, crosshair readout), parametric, polar and list plots, and rotatable,
   shaded 3D surfaces.
 - Function palette with search, a symbols palette, a variables inspector and a guide with clickable examples.
-- Evaluation on a dedicated kernel thread with Abort; notebooks saved as `.eqnb` (JSON); copy any output as
+- Calculations run on a dedicated engine thread and can be stopped; notebooks saved as `.eqnb` (JSON); copy any output as
   text, LaTeX or an image; light/dark themes; zoom.
 
 **Checking worked solutions**
@@ -173,7 +173,7 @@ tests/Equator.Core.Tests  unit and oracle tests (results checked against indepen
 Design notes:
 
 - Expressions are always canonical: sums and products are flattened and sorted, like terms and powers are
-  combined, and numeric coefficients are exact. Only `-1` is distributed over sums (as Mathematica does),
+  combined, and numeric coefficients are exact. Only `-1` is distributed over sums,
   so factored forms such as `2(x + 1)` survive.
 - The parser produces inert operator nodes (`@plus`, `@times`, …) that the kernel evaluates in order. This
   keeps matrix multiplication non-commutative while scalar algebra stays canonical.
@@ -182,7 +182,7 @@ Design notes:
 
 ## Limitations
 
-This is a compact CAS, not a replacement for Mathematica or Maple. Integration is heuristic (verified, but
+This is a compact CAS. Integration is heuristic (verified, but
 there is no Risch algorithm). Quartics and higher-degree irreducible polynomials have numeric roots unless
 they are binomial or cyclotomic. Equation solving returns principal solutions, not general families such as
 `x = π/6 + 2kπ`.

@@ -3,6 +3,7 @@ using Equator.Core.Engine;
 using Equator.Core.Printing;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -21,12 +22,15 @@ public sealed partial class CellControl : UserControl
 
     public event EventHandler<CellCommand>? Command;
     public event EventHandler<string>? UseAsInput;
+    /// <summary>Raised with a history reference such as "%3" when its chip is clicked.</summary>
+    public event EventHandler<string>? ReferenceRequested;
     public event EventHandler? Focused;
 
     public CellControl(string input = "")
     {
         InitializeComponent();
         Input.Text = input;
+        SetBadge(BadgeState.Pending);
         Input.TextChanged += (_, _) => TextChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -71,16 +75,53 @@ public sealed partial class CellControl : UserControl
 
     public void SetBusy(bool busy)
     {
-        Busy.IsActive = busy;
-        Busy.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         Tools.Visibility = busy ? Visibility.Collapsed : Visibility.Visible;
-        if (busy) InLabel.Text = "In[*]:=";
+        if (busy) SetBadge(BadgeState.Running);
     }
 
     public void ClearOutputs()
     {
         Outputs.Children.Clear();
-        InLabel.Text = "In[ ]:=";
+        _lastResult = null;
+        SetBadge(BadgeState.Pending);
+    }
+
+    // ---- step badge ---------------------------------------------------------------------------------
+
+    private enum BadgeState { Pending, Running, Done, Error }
+    private BadgeState _badge;
+
+    private void SetBadge(BadgeState state, int step = 0)
+    {
+        _badge = state;
+        bool running = state == BadgeState.Running;
+        Busy.IsActive = running;
+        Busy.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+        BadgeRing.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+        BadgeText.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+        // Styles (with ThemeResource setters) so the badge follows the cell's light or dark theme.
+        var res = Application.Current.Resources;
+        BadgeRing.Style = (Style)res[state switch
+        {
+            BadgeState.Done => "BadgeRingDone",
+            BadgeState.Error => "BadgeRingError",
+            _ => _focused ? "BadgeRingFocused" : "BadgeRingPending",
+        }];
+        BadgeText.Style = state == BadgeState.Done ? (Style)res["BadgeTextDone"] : (Style)res["ErrorText"];
+        BadgeText.Text = state switch
+        {
+            BadgeState.Done => step.ToString(CultureInfo.InvariantCulture),
+            BadgeState.Error => "!",
+            _ => "",
+        };
+        BadgeText.FontSize = state == BadgeState.Done && step >= 100 ? 10 : state == BadgeState.Error ? 13 : 12;
+        ToolTipService.SetToolTip(Badge, state switch
+        {
+            BadgeState.Done => $"Step {step}: refer to its result as %{step}",
+            BadgeState.Error => "This step has an error",
+            BadgeState.Running => "Running",
+            _ => "Not run yet",
+        });
     }
 
     // ---- results -----------------------------------------------------------------------------------
@@ -89,55 +130,79 @@ public sealed partial class CellControl : UserControl
     {
         _lastResult = result;
         Outputs.Children.Clear();
-        InLabel.Text = $"In[{result.Index}]:=";
-        bool first = true;
-        foreach (var output in result.Outputs)
+        bool failed = result.Outputs.Any(o => o.Kind == OutputKind.Error);
+        SetBadge(failed ? BadgeState.Error : BadgeState.Done, result.Index);
+        // The value recorded for this step is the last result: that panel carries the %n chip.
+        int last = -1;
+        for (int i = 0; i < result.Outputs.Count; i++)
+            if (result.Outputs[i].Kind is OutputKind.Expression or OutputKind.Plot) last = i;
+        for (int i = 0; i < result.Outputs.Count; i++)
         {
-            Outputs.Children.Add(BuildOutputRow(output, first ? $"Out[{result.Index}]=" : "", mathSize));
-            first = false;
-        }
-        if (result.Elapsed.TotalSeconds >= 0.5)
-        {
-            Outputs.Children.Add(new TextBlock
-            {
-                Text = result.Elapsed.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture) + " s",
-                FontSize = 11,
-                Margin = new Thickness(84, -4, 0, 0),
-                Style = (Style)Application.Current.Resources["TertiaryText"],
-            });
+            var output = result.Outputs[i];
+            var elapsed = i == result.Outputs.Count - 1 && result.Elapsed.TotalSeconds >= 0.5
+                ? result.Elapsed.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture) + " s"
+                : null;
+            Outputs.Children.Add(output.Kind == OutputKind.Error
+                ? ErrorContent(output)
+                : AnswerPanel(output, mathSize, i == last && !failed ? result.Index : null, elapsed));
         }
     }
 
-    private FrameworkElement BuildOutputRow(CellOutput output, string label, double mathSize)
+    /// <summary>
+    /// A result in a rounded panel: an accent arrow, the typeset value (or plot, or text) and, for the value
+    /// of the step, a chip that inserts a reference to it (%n) into the current cell.
+    /// </summary>
+    private FrameworkElement AnswerPanel(CellOutput output, double mathSize, int? reference, string? elapsed)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(84) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var res = Application.Current.Resources;
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        if (output.Kind is OutputKind.Expression && label.Length > 0)
+        if (output.Kind == OutputKind.Expression)
         {
-            var labelBlock = new TextBlock
-            {
-                Text = label,
-                FontFamily = new FontFamily("Cascadia Mono, Consolas"),
-                FontSize = 12,
-                Margin = new Thickness(0, 6, 10, 0),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Style = (Style)Application.Current.Resources["SecondaryText"],
-            };
-            row.Children.Add(labelBlock);
+            grid.Children.Add(new TextBlock { Text = "\u2192", Style = (Style)res["AnswerArrow"] });
         }
 
         FrameworkElement content = output.Kind switch
         {
             OutputKind.Expression => ExpressionContent(output, mathSize),
             OutputKind.Plot => PlotContent(output),
-            OutputKind.Text => TextContent(output),
-            _ => ErrorContent(output),
+            _ => TextContent(output),
         };
+        content.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(content, 1);
-        row.Children.Add(content);
-        return row;
+        grid.Children.Add(content);
+
+        var side = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        if (reference is int n)
+        {
+            var refText = "%" + n.ToString(CultureInfo.InvariantCulture);
+            var chip = new Button
+            {
+                Content = refText,
+                FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+                FontSize = 12,
+                Padding = new Thickness(8, 2, 8, 3),
+                MinHeight = 0,
+                CornerRadius = new CornerRadius(10),
+                HorizontalAlignment = HorizontalAlignment.Right,
+            };
+            ToolTipService.SetToolTip(chip, $"Insert {refText} (this result) into the current cell");
+            AutomationProperties.SetName(chip, $"Insert reference {refText}");
+            chip.Click += (_, _) => ReferenceRequested?.Invoke(this, refText);
+            side.Children.Add(chip);
+        }
+        if (elapsed is not null)
+            side.Children.Add(new TextBlock { Text = elapsed, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Right, Style = (Style)res["TertiaryText"] });
+        if (side.Children.Count > 0)
+        {
+            Grid.SetColumn(side, 2);
+            grid.Children.Add(side);
+        }
+
+        return new Border { Child = grid, Style = (Style)res["AnswerPanel"] };
     }
 
     private FrameworkElement ExpressionContent(CellOutput output, double mathSize)
@@ -281,7 +346,7 @@ public sealed partial class CellControl : UserControl
     private void Input_GotFocus(object sender, RoutedEventArgs e)
     {
         _focused = true;
-        FocusBar.Opacity = 1;
+        if (_badge == BadgeState.Pending) SetBadge(BadgeState.Pending);
         UpdateTools();
         Focused?.Invoke(this, EventArgs.Empty);
     }
@@ -289,7 +354,7 @@ public sealed partial class CellControl : UserControl
     private void Input_LostFocus(object sender, RoutedEventArgs e)
     {
         _focused = false;
-        FocusBar.Opacity = 0;
+        if (_badge == BadgeState.Pending) SetBadge(BadgeState.Pending);
         UpdateTools();
     }
 

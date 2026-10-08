@@ -24,7 +24,7 @@ public static class Builtins
     private static readonly Dictionary<string, Builtin> Table = new();
     private static readonly Dictionary<string, string> Aliases = new()
     {
-        ["D"] = "diff", ["derivative"] = "diff", ["int"] = "integrate", ["integral"] = "integrate",
+        ["derivative"] = "diff", ["int"] = "integrate", ["integral"] = "integrate",
         ["lim"] = "limit", ["taylor"] = "series", ["evalf"] = "N", ["n"] = "N", ["float"] = "N", ["numeric"] = "N",
         ["inverse"] = "inv", ["eye"] = "identity", ["eigenvals"] = "eigenvalues", ["eig"] = "eigenvalues",
         ["eigenvects"] = "eigenvectors", ["ln"] = "log", ["arcsin"] = "asin", ["arccos"] = "acos", ["arctan"] = "atan",
@@ -32,13 +32,9 @@ public static class Builtins
         ["choose"] = "binomial", ["ceiling"] = "ceil", ["tex"] = "latex", ["TeX"] = "latex", ["fsolve"] = "nsolve",
         ["roots"] = "solve", ["partialfractions"] = "apart", ["parfrac"] = "apart", ["length"] = "len", ["size"] = "dims",
         ["fib"] = "fibonacci", ["arg"] = "arg", ["sgn"] = "sign", ["conjugate"] = "conj", ["ifactor"] = "factorint",
-        ["primefactors"] = "factorint", ["Sum"] = "sum", ["Product"] = "product", ["Integrate"] = "integrate",
-        ["Simplify"] = "simplify", ["Expand"] = "expand", ["Factor"] = "factor", ["Solve"] = "solve", ["Limit"] = "limit",
-        ["Plot"] = "plot", ["Plot3D"] = "plot3d", ["ParametricPlot"] = "parametricplot", ["PolarPlot"] = "polarplot",
-        ["ListPlot"] = "listplot", ["Det"] = "det", ["Inverse"] = "inv", ["Transpose"] = "transpose", ["Series"] = "series",
-        ["DSolve"] = "dsolve", ["odesolve"] = "dsolve", ["Table"] = "table", ["avg"] = "mean", ["std"] = "stdev",
-        ["linspace"] = "range", ["seq"] = "table", ["nIntegrate"] = "nintegrate", ["NIntegrate"] = "nintegrate", ["quad"] = "nintegrate",
-        ["Apart"] = "apart", ["Together"] = "together", ["Cancel"] = "cancel", ["Help"] = "help", ["?"] = "help",
+        ["primefactors"] = "factorint", ["odesolve"] = "dsolve", ["avg"] = "mean", ["std"] = "stdev",
+        ["linspace"] = "range", ["seq"] = "table", ["nIntegrate"] = "nintegrate", ["quad"] = "nintegrate",
+        ["?"] = "help",
     };
 
     public static IEnumerable<Builtin> All => Table.Values.OrderBy(b => b.Category).ThenBy(b => b.Name);

@@ -142,6 +142,7 @@ public sealed partial class MainWindow : Window
         cell.Command += OnCellCommand;
         cell.Focused += (_, _) => _activeCell = cell;
         cell.UseAsInput += (s, text2) => { var c = InsertCell(IndexOf((CellControl)s!) + 1, text2); c.FocusInput(); };
+        cell.ReferenceRequested += (_, reference) => InsertIntoActive(reference);
         cell.TextChanged += (_, _) => MarkDirty();
         return cell;
     }
@@ -246,7 +247,7 @@ public sealed partial class MainWindow : Window
             cell.SetBusy(false);
             cell.ShowResult(result, MathSize);
             bool failed = result.Outputs.Any(o => o.Kind == OutputKind.Error);
-            SetStatus(failed ? "Finished with errors" : $"Evaluated In[{result.Index}] in {FormatTime(result.Elapsed)}", failed);
+            SetStatus(failed ? $"Step {result.Index} has an error" : $"Step {result.Index} done in {FormatTime(result.Elapsed)}", failed);
         }
         finally
         {
@@ -265,7 +266,7 @@ public sealed partial class MainWindow : Window
         _running++;
         AbortButton.IsEnabled = true;
         StatusDot.Fill = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
-        StatusText.Text = "Evaluating…";
+        StatusText.Text = "Running…";
     }
 
     private void EndRunning()
@@ -518,7 +519,7 @@ public sealed partial class MainWindow : Window
             _filePath = path;
             await _host.RunAsync(_host.Kernel.Reset);
             LoadCells(inputs, evaluate);
-            if (!evaluate) SetStatus($"Opened {Path.GetFileName(path)} — press F5 to evaluate all cells");
+            if (!evaluate) SetStatus($"Opened {Path.GetFileName(path)} — press F5 to run all cells");
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -607,7 +608,7 @@ public sealed partial class MainWindow : Window
     {
         await _host.RunAsync(_host.Kernel.Reset);
         foreach (var c in Cells) c.ClearOutputs();
-        SetStatus("Kernel restarted");
+        SetStatus("Session reset");
     }
 
     private async void Examples_Click(object sender, RoutedEventArgs e)
@@ -622,13 +623,13 @@ public sealed partial class MainWindow : Window
     {
         var text = string.Join("\n", new[]
         {
-            "Shift+Enter\tEvaluate the cell and move to the next one",
-            "Ctrl+Enter\tEvaluate the cell in place",
-            "Alt+Enter\tEvaluate and insert a new cell below",
+            "Shift+Enter\tRun the cell and move to the next one",
+            "Ctrl+Enter\tRun the cell and stay",
+            "Alt+Enter\tRun the cell and add a new one below",
             "↑ / ↓\tMove between cells (at the start/end of the input)",
             "Ctrl+Shift+Backspace\tDelete the cell",
-            "F5\tEvaluate all cells",
-            "Ctrl+Esc\tAbort the running evaluation",
+            "F5\tRun all cells",
+            "Ctrl+Esc\tStop the running calculation",
             "Ctrl+N / Ctrl+O / Ctrl+S\tNew / open / save notebook",
             "Ctrl+Plus / Ctrl+Minus\tZoom in / out",
             "",

@@ -5,7 +5,7 @@ public static class Examples
 {
     public static readonly string[] Welcome =
     [
-        "# Welcome to Equator. Edit any cell and press Shift+Enter to evaluate it.\nintegrate(x^2*sin(x), x)",
+        "# Welcome to Equator. Edit any cell and press Shift+Enter to run it.\nintegrate(x^2*sin(x), x)",
         "diff(atan(x)*exp(2x), x)",
         "solve(x^3 - 6x^2 + 11x - 6 = 0, x)",
         "limit((1 + 1/n)^n, n, oo)",

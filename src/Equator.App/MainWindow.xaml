@@ -53,16 +53,16 @@
                 <AppBarButton.Icon><FontIcon Glyph="&#xE74E;" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
-            <AppBarButton Label="Evaluate all" Click="EvaluateAll_Click" ToolTipService.ToolTip="Evaluate every cell in order (F5)">
+            <AppBarButton Label="Run all" Click="EvaluateAll_Click" ToolTipService.ToolTip="Run every cell from the top (F5)">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton x:Name="AbortButton" Label="Abort" Click="Abort_Click" IsEnabled="False" ToolTipService.ToolTip="Abort the running evaluation (Ctrl+Esc)">
+            <AppBarButton x:Name="AbortButton" Label="Stop" Click="Abort_Click" IsEnabled="False" ToolTipService.ToolTip="Stop the running calculation (Ctrl+Esc)">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE71A;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Clear outputs" Click="ClearOutputs_Click">
+            <AppBarButton Label="Clear results" Click="ClearOutputs_Click">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE894;" /></AppBarButton.Icon>
             </AppBarButton>
-            <AppBarButton Label="Restart kernel" Click="Restart_Click" ToolTipService.ToolTip="Forget all variables, functions and history">
+            <AppBarButton Label="Reset session" Click="Restart_Click" ToolTipService.ToolTip="Forget all variables, functions, assumptions and results">
                 <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
             </AppBarButton>
             <AppBarSeparator />
@@ -153,7 +153,7 @@
                 <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
             <TextBlock x:Name="StatusRight" HorizontalAlignment="Right" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                       Text="Shift+Enter evaluate · Alt+Enter evaluate and insert · ↑/↓ move between cells" />
+                       Text="Shift+Enter run · Alt+Enter run and add a cell · ↑/↓ move between cells · %n refers to step n" />
         </Grid>
     </Grid>
 </Window>

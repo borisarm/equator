@@ -44,6 +44,45 @@
             <Style x:Key="ErrorIcon" TargetType="FontIcon">
                 <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
             </Style>
+
+            <!-- Cell result panel and its arrow. -->
+            <Style x:Key="AnswerPanel" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="14,8,10,8" />
+            </Style>
+            <Style x:Key="AnswerArrow" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <Setter Property="FontSize" Value="18" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,-2,0,0" />
+            </Style>
+            <!-- Step badge ring before a cell has run. -->
+            <Style x:Key="BadgeRingPending" TargetType="Ellipse">
+                <Setter Property="Stroke" Value="{ThemeResource ControlStrongStrokeColorDefaultBrush}" />
+                <Setter Property="StrokeThickness" Value="1.5" />
+                <Setter Property="Fill" Value="Transparent" />
+            </Style>
+            <Style x:Key="BadgeRingFocused" TargetType="Ellipse">
+                <Setter Property="Stroke" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                <Setter Property="StrokeThickness" Value="1.5" />
+                <Setter Property="Fill" Value="Transparent" />
+            </Style>
+            <Style x:Key="BadgeRingDone" TargetType="Ellipse">
+                <Setter Property="Fill" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                <Setter Property="StrokeThickness" Value="0" />
+            </Style>
+            <Style x:Key="BadgeRingError" TargetType="Ellipse">
+                <Setter Property="Stroke" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+                <Setter Property="StrokeThickness" Value="1.5" />
+                <Setter Property="Fill" Value="Transparent" />
+            </Style>
+            <Style x:Key="BadgeTextDone" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
