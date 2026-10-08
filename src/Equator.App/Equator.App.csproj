@@ -30,5 +30,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Equator.Core\Equator.Core.csproj" />
+    <ProjectReference Include="..\Equator.Recognition\Equator.Recognition.csproj" />
   </ItemGroup>
 </Project>

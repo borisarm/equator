@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Equator.App.CheckWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Equator.App.Controls"
+    Title="Check work — Equator">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" AllowDrop="True" DragOver="Root_DragOver" Drop="Root_Drop">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="V" Modifiers="Control" Invoked="PasteAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="UndoAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="CheckAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
+
+        <!-- Title bar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="14,0,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="22" Height="22" CornerRadius="5" Background="{ThemeResource AccentFillColorDefaultBrush}">
+                    <FontIcon Glyph="&#xE76D;" FontSize="13" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
+                <TextBlock Text="Check work" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                <TextBlock Text="handwritten solutions, checked step by step" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Commands -->
+        <CommandBar Grid.Row="1" HorizontalAlignment="Left" DefaultLabelPosition="Right" Margin="4,0,0,2" Background="Transparent">
+            <AppBarButton Label="Open image" Click="Open_Click" ToolTipService.ToolTip="Open a photo or scan of the work (Ctrl+O)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8B9;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Paste" Click="Paste_Click" ToolTipService.ToolTip="Paste an image from the clipboard (Ctrl+V)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE77F;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="New page" Click="Draw_Click" ToolTipService.ToolTip="Clear the page and write with a pen, mouse or finger">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE76D;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Undo" Click="Undo_Click" ToolTipService.ToolTip="Remove the last stroke (Ctrl+Z). The pen eraser or right mouse button erases strokes.">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE7A7;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarButton x:Name="ReadButton" Label="Read" Click="Read_Click" ToolTipService.ToolTip="Recognise the lines on the page">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8D3;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Check" Click="Check_Click" ToolTipService.ToolTip="Check the steps (Ctrl+Enter)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE73E;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarButton Label="Insert into notebook" Click="Insert_Click" ToolTipService.ToolTip="Add a check(...) cell with these steps to the notebook">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8C8;" /></AppBarButton.Icon>
+            </AppBarButton>
+        </CommandBar>
+
+        <!-- Model status -->
+        <InfoBar x:Name="ModelBar" Grid.Row="2" Margin="14,0,14,6" IsClosable="False" Severity="Informational"
+                 Title="Handwriting model not installed"
+                 Message="Reading handwriting uses an on-device model (Pix2Text MFR 1.5, MIT licence). It is downloaded once from Hugging Face and then works offline. You can still type the steps on the right.">
+            <InfoBar.ActionButton>
+                <Button x:Name="DownloadButton" Content="Download" Click="Download_Click" />
+            </InfoBar.ActionButton>
+            <InfoBar.Content>
+                <ProgressBar x:Name="DownloadProgress" Margin="0,0,0,8" Visibility="Collapsed" Maximum="1" />
+            </InfoBar.Content>
+        </InfoBar>
+
+        <Grid Grid.Row="3" Padding="14,0,14,10" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="2*" MinWidth="380" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Writing surface -->
+            <Border CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                <Grid>
+                    <controls:ScratchPad x:Name="Pad" AutomationProperties.Name="Writing surface" />
+                    <ProgressRing x:Name="Busy" IsActive="False" Width="48" Height="48" />
+                </Grid>
+            </Border>
+
+            <!-- Steps -->
+            <Grid Grid.Column="1" RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <TextBlock Text="Steps" Style="{StaticResource PanelHeader}" VerticalAlignment="Center" />
+                    <TextBlock Text="Edit a line to fix a misread symbol" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Style="{StaticResource TertiaryText}" />
+                </Grid>
+                <ScrollViewer Grid.Row="1">
+                    <StackPanel x:Name="StepsPanel" Spacing="6" Padding="0,0,10,8" />
+                </ScrollViewer>
+                <Button Grid.Row="2" Click="AddStep_Click" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE710;" FontSize="12" />
+                        <TextBlock Text="Add step" />
+                    </StackPanel>
+                </Button>
+                <InfoBar x:Name="SummaryBar" Grid.Row="3" IsOpen="False" IsClosable="False" />
+            </Grid>
+        </Grid>
+
+        <!-- Status bar -->
+        <Grid Grid.Row="4" Padding="14,5" Background="{ThemeResource LayerFillColorDefaultBrush}"
+              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <TextBlock x:Name="StatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Text="Open or paste a photo of the work, or write on the page. The first line is the task; each following line is one step." />
+        </Grid>
+    </Grid>
+</Window>

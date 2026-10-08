@@ -59,6 +59,25 @@ Out[2]= y(x) = sin(x)
 - Evaluation on a dedicated kernel thread with Abort; notebooks saved as `.eqnb` (JSON); copy any output as
   text, LaTeX or an image; light/dark themes; zoom.
 
+**Checking handwritten work**
+
+- **Check work** (toolbar) opens a correction window: open, paste or drop a photo or scan of a worked
+  solution, or write on the page with a pen, mouse or finger. Each line is read with an on-device model
+  (Pix2Text MFR 1.5, MIT licence, ~120 MB, downloaded once on first use and verified by SHA-256; nothing is
+  sent anywhere for recognition), converted from LaTeX to Equator input, and shown as an editable step.
+- Every step is checked with the CAS. The first line is the task:
+  - an equation or system: each line must have the same real solution set as the previous one. Lost
+    solutions (dividing by an expression that can be zero, forgetting ±) are errors; extra roots introduced by
+    squaring are warnings that must be discarded by the final answer;
+  - an inequality: the solution sets must agree (e.g. forgetting to flip the sign is caught);
+  - an expression, derivative, integral or limit: each line must be equal to the previous one (integrals
+    up to a constant of integration), with a concrete counterexample when it is not.
+- Wrong steps are marked on the page and in the list, later steps are checked against the student's own
+  previous line, and the final answer is compared with the correct solution. Misread symbols can be fixed by
+  editing a line; a line that introduces letters not in the task is flagged as a possible misreading.
+- The same checker is available in cells: `check(["2x + 3 = 7", "2x = 4", "x = 2"])`, and
+  `checklatex([...])` for LaTeX steps. **Insert into notebook** creates such a cell.
+
 ## Building and running
 
 Requirements: Windows 10 1904x or later, .NET 10 SDK. NuGet restores the Windows App SDK and Win2D.
@@ -119,11 +138,19 @@ src/Equator.Core
                           arbitrary precision (BigFloat, BigMath, BigEval), PSLQ, numeric self-checks
   Engine/Assumptions.cs   assumption sets and sign/range inference by interval arithmetic
   Printing/               display tree → plain text, LaTeX, and typesetting boxes
+  Parsing/LatexConverter  LaTeX (as produced by handwriting recognition) → Equator input lines
+  Checking/WorkChecker    step-by-step verification of worked solutions
+src/Equator.Recognition   on-device handwriting recognition: image clean-up and line splitting
+                          (GrayImage), TrOCR-style encoder/decoder on ONNX Runtime via Windows ML
+                          (FormulaRecognizer), byte-level BPE decoding, model download and verification
 src/Equator.App
   Rendering/MathLayout.cs box layout with Win2D font metrics (TeX-like spacing and metrics)
-  Controls/               MathView, PlotView, SurfaceView, CellControl
+  Controls/               MathView, PlotView, SurfaceView, CellControl, ScratchPad (page view and ink)
+  CheckWindow             correction mode
   Services/KernelHost.cs  kernel thread (large stack, cooperative abort)
-tests/Equator.Core.Tests  136 tests, including integrals verified by differentiating back
+tests/Equator.Core.Tests         unit and oracle tests (results checked against independent computations)
+tests/Equator.Recognition.Tests  image processing; end-to-end recognition and checking when the model is
+                                 present locally (models/ or %LOCALAPPDATA%\Equator\models)
 ```
 
 Design notes:
@@ -138,11 +165,15 @@ Design notes:
 
 ## Limitations
 
-This is a compact CAS, not a replacement for Mathematica or Maple. Integration is heuristic: there is no
-Risch algorithm, and denominators that are irreducible over ℚ but split over the reals (e.g. `x^4 + 1`) are
-not handled. Polynomial factorisation finds linear and quadratic factors over ℚ only. Floating-point
-results use double precision. Equation solving returns principal solutions, not general families such as
+This is a compact CAS, not a replacement for Mathematica or Maple. Integration is heuristic (verified, but
+there is no Risch algorithm). Quartics and higher-degree irreducible polynomials have numeric roots unless
+they are binomial or cyclotomic. Equation solving returns principal solutions, not general families such as
 `x = π/6 + 2kπ`.
+
+Handwriting recognition reads one formula per line; it is good on clear writing and printed text and makes
+mistakes on messy writing (similar digits and letters, superscripts). Recognised lines are editable for
+that reason. Worked solutions should put one step per line; the checker works over the real numbers and
+handles equations, systems, inequalities in one variable and expression transformations, not proofs in prose.
 
 ## Diagnostics
 

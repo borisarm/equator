@@ -47,6 +47,8 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) => _host.Dispose();
         if (Environment.GetEnvironmentVariable("EQUATOR_THEME") is "dark" or "light")
             RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("EQUATOR_THEME") == "dark" ? ElementTheme.Dark : ElementTheme.Light;
+        if (Environment.GetEnvironmentVariable("EQUATOR_CHECK_IMAGE") is { Length: > 0 })
+            DispatcherQueue.TryEnqueue(OpenCheckWindow);
         if (Environment.GetEnvironmentVariable("EQUATOR_SNAPSHOT") is { Length: > 0 } snapPath)
         {
             _snapshotTimer = DispatcherQueue.CreateTimer();
@@ -576,6 +578,30 @@ public sealed partial class MainWindow : Window
     private void Abort_Click(object sender, RoutedEventArgs e) => _host.Abort();
     private void ClearOutputs_Click(object sender, RoutedEventArgs e) { foreach (var c in Cells) c.ClearOutputs(); }
     private void AddCell_Click(object sender, RoutedEventArgs e) => InsertCell(CellsPanel.Children.Count).FocusInput();
+
+    private CheckWindow? _checkWindow;
+
+    private void CheckWork_Click(object sender, RoutedEventArgs e) => OpenCheckWindow();
+
+    /// <summary>Opens (or brings forward) the correction-mode window.</summary>
+    private void OpenCheckWindow()
+    {
+        if (_checkWindow is null)
+        {
+            _checkWindow = new CheckWindow(RootGrid.ActualTheme, InsertCheckCell);
+            _checkWindow.Closed += (_, _) => _checkWindow = null;
+        }
+        _checkWindow.Activate();
+    }
+
+    /// <summary>Adds a check([...]) cell with the given steps and evaluates it.</summary>
+    private async void InsertCheckCell(IReadOnlyList<string> steps)
+    {
+        var text = "check([\n    " + string.Join(",\n    ", steps.Select(s => "\"" + s.Replace("\"", "'") + "\"")) + "\n])";
+        var cell = InsertCell(CellsPanel.Children.Count, text);
+        await EvaluateCellAsync(cell);
+        Activate();
+    }
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetZoom(_zoom * 1.1);
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => SetZoom(_zoom / 1.1);
     private void Theme_Click(object sender, RoutedEventArgs e) => ToggleTheme();
