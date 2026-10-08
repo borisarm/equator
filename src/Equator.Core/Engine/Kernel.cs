@@ -18,7 +18,19 @@ public sealed class Kernel
     private readonly Dictionary<int, Expr> _out = new();
     private readonly List<Expr> _history = [];
     private readonly HashSet<string> _shadowed = [];
+    private AssumptionSet _assumptions = AssumptionSet.Empty;
     private int _depth;
+
+    /// <summary>Assumptions about symbols made with assume(); in effect during every evaluation.</summary>
+    public AssumptionSet Assumptions
+    {
+        get => _assumptions;
+        set
+        {
+            _assumptions = value;
+            Engine.Assumptions.SetCurrent(value);
+        }
+    }
 
     public int ExecutionCount { get; private set; }
 
@@ -34,6 +46,7 @@ public sealed class Kernel
         _funcs.Clear();
         _out.Clear();
         _history.Clear();
+        _assumptions = AssumptionSet.Empty;
         ExecutionCount = 0;
         EnvironmentChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -51,6 +64,7 @@ public sealed class Kernel
         var sw = Stopwatch.StartNew();
         var outputs = new List<CellOutput>();
         using var _ = Interrupt.Scope(cancellation);
+        using var __ = Engine.Assumptions.Scope(_assumptions);
 
         IReadOnlyList<Statement> statements;
         try
@@ -203,9 +217,25 @@ public sealed class Kernel
         return x * y;
     }
 
-    private static Expr Relation(string op, Expr l, Expr r)
+    public static Expr Relation(string op, Expr l, Expr r)
     {
         var d = l - r;
+        // Decided by the assumptions (assume(x > 0): x + 1 > 0 is True).
+        if (!d.IsConstant && Engine.Assumptions.Sign(d) is int sign)
+        {
+            bool? decided = op switch
+            {
+                "<" => sign < 0, ">" => sign > 0, "<=" => sign <= 0, ">=" => sign >= 0,
+                "!=" => sign != 0, "==" => sign == 0, _ => null,
+            };
+            if (decided is bool dv) return new Sym(dv ? "True" : "False");
+        }
+        if (!d.IsConstant && op is "<=" or ">=")
+        {
+            var range = Engine.Assumptions.Range(d);
+            if (op == ">=" && range.NonNegative) return new Sym("True");
+            if (op == "<=" && range.NonPositive) return new Sym("True");
+        }
         if (d.IsConstant && !d.IsUndefinedOrInfinite)
         {
             double v;
@@ -337,6 +367,20 @@ public sealed class Kernel
         FnExpr { Name: "@eq" } q when q.Args[0] is Sym ls => [ls.Name],
         _ => [],
     };
+
+    /// <summary>Evaluates a parsed expression with a variable temporarily bound to a value.</summary>
+    public Expr EvalWith(string name, Expr value, Expr raw)
+    {
+        bool had = _vars.TryGetValue(name, out var old);
+        bool wasShadowed = _shadowed.Remove(name);
+        _vars[name] = value;
+        try { return Eval(raw); }
+        finally
+        {
+            if (had) _vars[name] = old!; else _vars.Remove(name);
+            if (wasShadowed) _shadowed.Add(name);
+        }
+    }
 
     private Expr CallUser(UserFunction uf, List<Expr> args)
     {

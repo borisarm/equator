@@ -10,7 +10,11 @@ namespace Equator.Core.Calculus;
 public static class Limits
 {
     /// <param name="dir">0 = two-sided, +1 = from the right (x → a⁺), −1 = from the left (x → a⁻).</param>
-    public static Expr Limit(Expr f, Expr x, Expr a, int dir = 0)
+    /// <summary>Limit along the real line (the variable is taken to be real).</summary>
+    public static Expr Limit(Expr f, Expr x, Expr a, int dir = 0) =>
+        Engine.Assumptions.WithVariable(x, "real", () => LimitCore(Engine.Assumptions.Refine(f), x, a, dir));
+
+    private static Expr LimitCore(Expr f, Expr x, Expr a, int dir)
     {
         if (x is not Sym) throw new MathException("Limit variable must be a symbol.");
         if (f.FreeOf(x)) return f;

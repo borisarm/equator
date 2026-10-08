@@ -696,12 +696,40 @@ public static class Solver
 
         if (eqs.Count == 1 && vars.Count == 1)
         {
-            var sols = SolveFor(eqs[0], vars[0], out _);
+            var sols = SolveFor(eqs[0], vars[0], out _).Where(s => Admissible((Sym)vars[0], s));
             return Expr.List(sols.Select(s => Expr.Equation(vars[0], s)));
         }
 
         var systemSols = SolveSystem(eqs.Select(e => e is EqExpr q ? q.Lhs - q.Rhs : e).ToList(), vars);
         return Expr.List(systemSols.Select(sol => Expr.List(vars.Where(sol.ContainsKey).Select(v => Expr.Equation(v, sol[v])))));
+    }
+
+    /// <summary>False when a solution value contradicts the assumptions about the variable (real, integer, bounds).</summary>
+    public static bool Admissible(Sym x, Expr value)
+    {
+        var facts = Engine.Assumptions.Current.For(x.Name);
+        if (facts == Engine.SymbolFacts.None) return true;
+        if (value.IsConstant && !value.IsUndefinedOrInfinite)
+        {
+            System.Numerics.Complex v;
+            try { v = NumericEval.Eval(value); }
+            catch (MathException) { return true; }
+            bool real = Math.Abs(v.Imaginary) <= 1e-12 * (1 + Math.Abs(v.Real));
+            if (facts.Real && !real) return false;
+            if (!real) return true;
+            double r = v.Real, tol = 1e-12 * (1 + Math.Abs(r));
+            if (facts.Integer && Math.Abs(r - Math.Round(r)) > tol) return false;
+            if (r < facts.Lo - tol || (facts.LoStrict && r <= facts.Lo + tol && !double.IsInfinity(facts.Lo))) return false;
+            if (r > facts.Hi + tol || (facts.HiStrict && r >= facts.Hi - tol && !double.IsInfinity(facts.Hi))) return false;
+            if (facts.NonZero && Math.Abs(r) <= tol) return false;
+            return true;
+        }
+        // Symbolic values: reject only what the assumptions disprove.
+        var range = Engine.Assumptions.Range(value);
+        if (!range.Real) return true;
+        if (!double.IsNegativeInfinity(facts.Lo) && (range.Hi < facts.Lo || (range.Hi == facts.Lo && (facts.LoStrict || range.HiOpen)))) return false;
+        if (!double.IsPositiveInfinity(facts.Hi) && (range.Lo > facts.Hi || (range.Lo == facts.Hi && (facts.HiStrict || range.LoOpen)))) return false;
+        return true;
     }
 
     private static List<Dictionary<Expr, Expr>> SolveSystem(List<Expr> eqs, List<Expr> vars)

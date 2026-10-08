@@ -95,6 +95,11 @@ public static class Simplifier
         {
             var combined = Safe(() => CombineLogs(expanded ?? e));
             if (combined is not null) yield return combined;
+            if (Engine.Assumptions.Active)
+            {
+                var split = Safe(() => Expansion.Expand(ExpandLogs(e)));
+                if (split is not null) yield return split;
+            }
         }
     }
 
@@ -315,6 +320,28 @@ public static class Simplifier
     });
 
     // ---- logarithms -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// log(a b) → log a + log b and log(a^r) → r log a, where the assumptions show the factors are positive
+    /// (both identities fail for general complex arguments).
+    /// </summary>
+    public static Expr ExpandLogs(Expr e) => e.MapBottomUp(z =>
+    {
+        if (z is not FnExpr { Name: "log" } lg) return z;
+        var arg = lg.Args[0];
+        if (arg is MulExpr m)
+        {
+            var positive = m.Factors.Where(Engine.Assumptions.IsPositive).ToList();
+            if (positive.Count == 0) return z;
+            var rest = Expr.Times(m.Factors.Where(f => !positive.Contains(f)));
+            var parts = positive.Select(f => ExpandLogs(Expr.Call("log", f))).ToList();
+            if (!rest.IsOne) parts.Add(Expr.Call("log", rest));
+            return Expr.Plus(parts);
+        }
+        if (arg is PowExpr p && Engine.Assumptions.IsPositive(p.Base) && Engine.Assumptions.IsReal(p.Exponent))
+            return p.Exponent * ExpandLogs(Expr.Call("log", p.Base));
+        return z;
+    });
 
     /// <summary>log(a) + log(b) -> log(a b) and n log(a) -> log(a^n) for numeric arguments.</summary>
     private static Expr CombineLogs(Expr e)

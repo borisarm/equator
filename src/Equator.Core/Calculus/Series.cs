@@ -63,7 +63,11 @@ public static class Sums
 {
     private const int DirectLimit = 20000;
 
-    public static Expr Sum(Expr f, Expr k, Expr a, Expr b)
+    /// <summary>Σ f for k from a to b; the index is an integer.</summary>
+    public static Expr Sum(Expr f, Expr k, Expr a, Expr b) =>
+        Engine.Assumptions.WithVariable(k, "integer", () => SumCore(Engine.Assumptions.Refine(f), k, a, b));
+
+    private static Expr SumCore(Expr f, Expr k, Expr a, Expr b)
     {
         if (k is not Sym) throw new MathException("Summation index must be a symbol.");
         if (a is Num na && b is Num nb && na.Value.IsInteger && nb.Value.IsInteger)
@@ -192,6 +196,28 @@ public static class Sums
             var zeta = p is Num { Value.IsInteger: true } pi && pi.Value.Num <= 30 && pi.Value.Num.IsEven ? Zeta((int)pi.Value.Num) : Expr.Call("zeta", p);
             var head = Expr.Plus(Enumerable.Range(1, (int)first.Value.Num - 1).Select(j => Expr.Power(new Num(j), -p)));
             return zeta - head;
+        }
+
+        // Alternating p-series: Σ_{k≥1} (−1)^k / k^p = −(1 − 2^(1−p)) ζ(p)  (= −log 2 for p = 1).
+        // c (−1)^(k+s) / k^p with constants c and integer s.
+        if (f is MulExpr am && a is Num { Value.IsInteger: true } afirst && afirst.Value.Num >= 1 && afirst.Value.Num < 1000)
+        {
+            var sign = am.Factors.FirstOrDefault(z => z is PowExpr { Base: Num { Value.IsMinusOne: true } } ps && Expansion.Expand(ps.Exponent - k) is Num { Value.IsInteger: true });
+            var power = am.Factors.FirstOrDefault(z => z is PowExpr { Base: var pb2, Exponent: var pe2 } && pb2 == k && pe2.FreeOf(k));
+            var others = am.Factors.Where(z => !ReferenceEquals(z, sign) && !ReferenceEquals(z, power)).ToList();
+            if (sign is PowExpr ps2 && power is PowExpr pk && others.All(z => z.FreeOf(k)))
+            {
+                var shift = (Num)Expansion.Expand(ps2.Exponent - k);
+                var c = Expr.Times(others) * Expr.Power(-1, shift);
+                var p = -pk.Exponent;
+                double pv = p.IsConstant ? NumericEval.EvalReal(p) : double.NaN;
+                if (pv > 0 || !p.IsConstant)
+                {
+                    var total = p.IsOne ? -Expr.Call("log", 2) : -(1 - Expr.Power(2, 1 - p)) * Expr.Call("zeta", p);
+                    var head = Expr.Plus(Enumerable.Range(1, (int)afirst.Value.Num - 1).Select(j => Expr.Power(-1, j) * Expr.Power(new Num(j), -p)));
+                    return Solver.Tidy(c * (total - head));
+                }
+            }
         }
 
         // Telescoping rational sums via partial fractions.

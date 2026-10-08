@@ -29,7 +29,9 @@ public static class Examples
         ("Algebra",
             "Exact rational arithmetic, polynomial algebra and equation solving.",
             ["expand((x + y)^5)", "factor(x^4 - 16)", "simplify((x^2 - 1)/(x^2 + 2x + 1))", "apart((3x + 5)/((x + 1)*(x + 2)^2), x)",
-             "solve(x^2 + 2x + 5 = 0, x)", "solve([x + y = 10, x*y = 21], [x, y])", "nsolve(cos(x) = x^2, x)"]),
+             "solve(x^2 + 2x + 5 = 0, x)", "solve([x + y = 10, x*y = 21], [x, y])", "nsolve(cos(x) = x^2, x)",
+             "factor(x^3 + y^3 + z^3 - 3x*y*z)", "gcd(x^4 - y^4, x^6 - y^6)", "solve(x^3 - 3x + 1 = 0, x)",
+             "solve(x^2 - 4 < 0, x)", "solve(sqrt(x + 3) = x - 3, x)", "discriminant(x^3 + p*x + q, x)"]),
         ("Calculus",
             "Derivatives, integrals (indefinite and definite), limits, series and sums.",
             ["diff(sin(x)^3*log(x), x)", "integrate(exp(x)*cos(2x), x)", "integrate(sqrt(1 - x^2), x, -1, 1)",
@@ -48,5 +50,12 @@ public static class Examples
         ("Numbers",
             "",
             ["factorint(2^32 + 1)", "isprime(2^61 - 1)", "100!", "binomial(50, 25)", "gcd(1071, 462)"]),
+        ("Precision",
+            "N(expr, digits) evaluates to any number of significant digits; identify recognises exact constants from decimals.",
+            ["N(pi, 100)", "N(exp(pi*sqrt(163)), 40)", "N(zeta(3), 50)", "identify(N((1 + sqrt(5))/2, 40))", "identify(1.4142135623730951)"]),
+        ("Assumptions",
+            "Variables are complex unless you say otherwise. assume(x > 0) or assume(n, integer) refine results; forget(x) removes them.",
+            ["assume(x > 0);\nsqrt(x^2)", "assume(n, integer);\nsin(n*pi) + cos(n*pi)", "assume(a > 0);\nintegrate(exp(-a*x^2), x, -oo, oo)",
+             "simplify(log(x*y) - log(x) - log(y), x > 0, y > 0)", "is(x^2 + 1 > 0)", "assumptions()"]),
     ];
 }

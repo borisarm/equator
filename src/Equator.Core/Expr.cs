@@ -371,7 +371,17 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
             for (int i = factors.Count - 1; i >= 0; i--)
             {
                 var f = factors[i];
-                if (f == Infinity || f == ComplexInfinity || !f.IsConstant || f.IsUndefinedOrInfinite) continue;
+                if (f == Infinity || f == ComplexInfinity || f.IsUndefinedOrInfinite) continue;
+                if (!f.IsConstant)
+                {
+                    // Parameters of known sign (assume(a > 0)): a·∞ = ∞.
+                    if (Engine.Assumptions.Active && Engine.Assumptions.Sign(f) is int fs && fs != 0)
+                    {
+                        if (fs < 0) q = -q;
+                        factors.RemoveAt(i);
+                    }
+                    continue;
+                }
                 double v;
                 try { v = Numerics.NumericEval.EvalReal(f); }
                 catch (MathException) { continue; }
@@ -466,6 +476,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
                 if (v < 0) return Zero;
                 if (v > 0) return b;
             }
+            if (Engine.Assumptions.Active && Engine.Assumptions.Sign(e) is int es && es != 0) return es < 0 ? Zero : b;
             return new PowExpr(b, e);
         }
         if (e == Infinity || (e.IsInfinite && e.HasNegativeCoefficient))
@@ -523,6 +534,38 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
             if (e.IsInteger) return Power(pb.Base, Times(pb.Exponent, e));
             if (pb.Exponent is Num pe && pe.Value > BigRational.MinusOne && pe.Value <= BigRational.One)
                 return Power(pb.Base, Times(pb.Exponent, e));
+            if (Engine.Assumptions.Active)
+            {
+                // (x^a)^b = x^(a b) for x ≥ 0 and real a, b.
+                if (Engine.Assumptions.IsNonNegative(pb.Base) && Engine.Assumptions.IsReal(pb.Exponent) && Engine.Assumptions.IsReal(e))
+                    return Power(pb.Base, Times(pb.Exponent, e));
+                // (x^(2k))^(p/(2k)) = |x|^p for real x.
+                if (pb.Exponent is Num { Value: var inner } && inner.IsInteger && inner.Num.IsEven && e is Num { Value: var outer }
+                    && (inner * outer).IsInteger && Engine.Assumptions.IsReal(pb.Base))
+                    return Power(Call("abs", pb.Base), new Num(inner * outer));
+            }
+        }
+
+        if (Engine.Assumptions.Active)
+        {
+            // (−1)^k for an integer k: decided by parity.
+            if (b is Num { Value.IsMinusOne: true } && !e.IsNumber && Engine.Assumptions.IsInteger(e))
+            {
+                if (Engine.Assumptions.IsInteger(e / 2)) return One;
+                if (Engine.Assumptions.IsInteger((e - 1) / 2)) return MinusOne;
+            }
+            // Fractional powers of products: pull out the factors known to be non-negative.
+            if (b is MulExpr mp && !e.IsInteger && Engine.Assumptions.IsReal(e))
+            {
+                var nonneg = mp.Factors.Where(f => !f.IsNumber && Engine.Assumptions.IsNonNegative(f)).ToList();
+                if (nonneg.Count > 0 && nonneg.Count < mp.Factors.Count)
+                {
+                    var rest = Times(mp.Factors.Where(f => !nonneg.Contains(f)));
+                    return Times(nonneg.Select(f => Power(f, e)).Append(Power(rest, e)));
+                }
+                if (nonneg.Count == mp.Factors.Count)
+                    return Times(mp.Factors.Select(f => Power(f, e)));
+            }
         }
 
         if (b is MulExpr mb)

@@ -12,7 +12,11 @@ public static class Integrator
 {
     private const int MaxDepth = 7;
 
-    public static Expr? Antiderivative(Expr f, Expr x)
+    /// <summary>Antiderivative on the real line (the integration variable is taken to be real).</summary>
+    public static Expr? Antiderivative(Expr f, Expr x) =>
+        Engine.Assumptions.WithVariable(x, "real", () => AntiderivativeCore(Engine.Assumptions.Refine(f), x));
+
+    private static Expr? AntiderivativeCore(Expr f, Expr x)
     {
         if (x is not Sym) throw new MathException("Integration variable must be a symbol.");
         var r = Integrate(f, x, 0);
@@ -141,7 +145,7 @@ public static class Integrator
                     var a = LinearSlope(e, x);
                     if (a is not null) return b == Expr.E ? f / a : f / (a * Expr.Call("log", b));
                     // Gaussian: e^(c x^2) with c < 0
-                    if (b == Expr.E && PolyView.Coefficients(e, x) is { Count: 3 } c && c[1].IsZero && c[0].IsZero && c[2].IsNegativeNumber)
+                    if (b == Expr.E && PolyView.Coefficients(e, x) is { Count: 3 } c && c[1].IsZero && c[0].IsZero && (c[2].IsNegativeNumber || Engine.Assumptions.IsNegative(c[2])))
                     {
                         var k = -c[2];
                         return Expr.Sqrt(Expr.Pi) / (2 * Expr.Sqrt(k)) * Expr.Call("erf", Expr.Sqrt(k) * x);
@@ -683,7 +687,7 @@ public static class Integrator
         if (c is null || c.Count != 3) return null;
         var (A, B, C) = (c[2], c[1], c[0]);
         Expr inverseSqrt;
-        bool negative = A.IsNegativeNumber || (A.IsConstant && !A.Contains(Expr.I) && NumericEval.EvalReal(A) < 0);
+        bool negative = A.IsNegativeNumber || (A.IsConstant && !A.Contains(Expr.I) && NumericEval.EvalReal(A) < 0) || Engine.Assumptions.IsNegative(A);
         if (negative)
         {
             var disc = Solver.Tidy(Expansion.Expand(B * B - 4 * A * C));
@@ -704,7 +708,10 @@ public static class Integrator
 
     // ---- definite integrals ---------------------------------------------------------------------------
 
-    public static Expr Definite(Expr f, Expr x, Expr a, Expr b)
+    public static Expr Definite(Expr f, Expr x, Expr a, Expr b) =>
+        Engine.Assumptions.WithVariable(x, "real", () => DefiniteCore(Engine.Assumptions.Refine(f), x, a, b));
+
+    private static Expr DefiniteCore(Expr f, Expr x, Expr a, Expr b)
     {
         bool numericOnly = f.FreeSymbols().All(s => s == x) && a.IsConstant && b.IsConstant;
         (double Value, double Error)? numeric = null;

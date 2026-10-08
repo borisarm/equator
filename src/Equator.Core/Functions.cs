@@ -78,6 +78,9 @@ public static class Functions
 
     private static Expr? Special(string name, Expr x)
     {
+        if (Engine.Assumptions.Active && name is "sin" or "cos" or "tan" && x.Contains(Expr.Pi) && !x.IsConstant
+            && TrigAtIntegerMultiple(name, x) is { } atMultiple)
+            return atMultiple;
         switch (name)
         {
             case "sin": return TrigExact(x, 0);
@@ -142,7 +145,8 @@ public static class Functions
                 if (x == Expr.E) return Expr.One;
                 if (x.IsZero) return -Expr.Infinity;
                 if (x == Expr.Infinity) return Expr.Infinity;
-                if (x is PowExpr { Base: Sym { Name: "E" } } pe) return pe.Exponent;
+                // log(e^u) = u only when Im u lies in (−π, π]; real u is the common case.
+                if (x is PowExpr { Base: Sym { Name: "E" } } pe && (Engine.Assumptions.IsReal(pe.Exponent) || pe.Exponent.IsNumber)) return pe.Exponent;
                 if (x == Expr.I) return Expr.I * Expr.Pi / 2;
                 if (x is Num n && n.Value.IsMinusOne) return Expr.I * Expr.Pi;
                 if (x is Num r && r.Value.Sign > 0 && !r.Value.IsInteger && r.Value.Num.IsOne)
@@ -159,11 +163,21 @@ public static class Functions
                     if (v < 0) return -x;
                 }
                 if (x is FnExpr { Name: "abs" }) return x;
-                if (x is PowExpr { Exponent: Num { Value.IsInteger: true } ev } pa && ev.Value.Num.IsEven) return x;
+                // |a + b i| = sqrt(a² + b²) for constants.
+                if (x.IsConstant && x.Contains(Expr.I) && ComplexParts(x) is var (are, aim))
+                    return Algebra.Radicals.Denest(Expr.Sqrt(Algebra.Expansion.Expand(are * are + aim * aim)));
+                // |x^(2k)| = x^(2k) only for real x.
+                if (x is PowExpr { Exponent: Num { Value.IsInteger: true } ev } pa && ev.Value.Num.IsEven && Engine.Assumptions.IsReal(pa.Base)) return x;
+                if (Engine.Assumptions.Active)
+                {
+                    if (Engine.Assumptions.IsNonNegative(x)) return x;
+                    if (Engine.Assumptions.IsNonPositive(x)) return -x;
+                }
                 return null;
             case "sign":
                 if (x.IsConstant && !x.Contains(Expr.I) && !x.IsUndefinedOrInfinite)
                     return Math.Sign(NumericEval.EvalReal(x));
+                if (Engine.Assumptions.Active && Engine.Assumptions.Sign(x) is int sg) return sg;
                 return null;
             case "floor": case "ceil": case "round":
                 if (x is Num q)
@@ -181,6 +195,7 @@ public static class Functions
                     double res = name == "floor" ? Math.Floor(v) : name == "ceil" ? Math.Ceiling(v) : Math.Floor(v + 0.5);
                     return new Num(new BigInteger(res));
                 }
+                if (Engine.Assumptions.Active && Engine.Assumptions.IsInteger(x)) return x;
                 return null;
             case "factorial":
                 if (x is Num { Value.IsInteger: true } k)
@@ -220,12 +235,21 @@ public static class Functions
                 }
                 if (x == Expr.Infinity) return Expr.One;
                 return null;
+            case "arg":
+                if (x.IsConstant && !x.IsUndefinedOrInfinite && ComplexParts(x) is var (gre, gim))
+                {
+                    if (gre.IsZero && gim.IsZero) return null;
+                    return Apply("atan2", [gim, gre]);
+                }
+                if (Engine.Assumptions.IsPositive(x)) return Expr.Zero;
+                if (Engine.Assumptions.IsNegative(x)) return Expr.Pi;
+                return null;
             case "re":
-                return x.IsNumber ? x : null;
+                return x.IsNumber || Engine.Assumptions.IsReal(x) ? x : null;
             case "im":
-                return x.IsNumber ? Expr.Zero : null;
+                return x.IsNumber || Engine.Assumptions.IsReal(x) ? Expr.Zero : null;
             case "conj":
-                if (x.IsNumber) return x;
+                if (x.IsNumber || Engine.Assumptions.IsReal(x)) return x;
                 if (x.IsConstant) return x.Substitute(Expr.I, -Expr.I);
                 return null;
         }
@@ -276,6 +300,37 @@ public static class Functions
                 }
                 return null;
         }
+        return null;
+    }
+
+    /// <summary>Exact real and imaginary parts of a constant that is polynomial in I with real coefficients.</summary>
+    private static (Expr Re, Expr Im)? ComplexParts(Expr z)
+    {
+        var c = Algebra.PolyView.Coefficients(Algebra.Expansion.Expand(z), Expr.I);
+        if (c is null || c.Any(k => k.Contains(Expr.I) || !Engine.Assumptions.IsReal(k))) return null;
+        Expr re = Expr.Zero, im = Expr.Zero;
+        for (int k = 0; k < c.Count; k++)
+        {
+            switch (k % 4)
+            {
+                case 0: re += c[k]; break;
+                case 1: im += c[k]; break;
+                case 2: re -= c[k]; break;
+                default: im -= c[k]; break;
+            }
+        }
+        return (re, im);
+    }
+
+    /// <summary>sin, cos, tan of k·π (or (k + 1/2)·π) when k is known to be an integer.</summary>
+    private static Expr? TrigAtIntegerMultiple(string name, Expr x)
+    {
+        var k = Algebra.Rational.Cancel(x / Expr.Pi);
+        if (Engine.Assumptions.IsInteger(k))
+            return name switch { "sin" or "tan" => Expr.Zero, _ => Expr.Power(Expr.MinusOne, k) };
+        var h = Algebra.Expansion.Expand(k - Expr.Half);
+        if (Engine.Assumptions.IsInteger(h))
+            return name switch { "cos" => Expr.Zero, "sin" => Expr.Power(Expr.MinusOne, h), _ => Expr.ComplexInfinity };
         return null;
     }
 

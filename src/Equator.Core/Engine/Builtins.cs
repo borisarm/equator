@@ -193,8 +193,48 @@ public static class Builtins
             "dsolve(y'' + y = 0, y, x)", 3, 3, (k, a) => Ode.Solve(a[0], Var(a[1], "dsolve"), Var(a[2], "dsolve")), 1, 2);
 
         // Algebra
-        Add("simplify", Alg, "simplify(expr)", "Tries algebraic, rational and trigonometric transformations and returns the simplest form.",
-            "simplify(sin(x)^2 + cos(x)^2)", 1, 1, (k, a) => Simplified(a[0]));
+        Add("simplify", Alg, "simplify(expr)  ·  simplify(expr, x > 0, ...)", "Tries algebraic, rational and trigonometric transformations and returns the simplest form (optionally under extra assumptions).",
+            "simplify(sqrt(x^2), x > 0)", 1, 10, (k, a) =>
+                a.Length == 1 ? Simplified(a[0]) : WithConditions(a.Skip(1), () => Simplified(Assumptions.Refine(a[0]))));
+
+        // Assumptions
+        const string Assume = "Assumptions";
+        Add("assume", Assume, "assume(x > 0, ...)  ·  assume(x, real)", "Declares assumptions about variables (inequalities with a number, or real, integer, positive, negative, nonnegative, nonpositive, nonzero, natural). They refine results from then on.",
+            "assume(x > 0)", 1, 10, (k, a) =>
+            {
+                var set = k.Assumptions;
+                if (a.Length == 2 && a[0] is Sym s && a[1] is Sym { IsSpecial: false } prop && !s.IsSpecial)
+                    set = set.AddProperty(s, prop.Name);
+                else
+                    foreach (var c in a)
+                    {
+                        if (c is Sym { Name: "False" }) throw new MathException("assume: this contradicts the current assumptions or values.");
+                        set = set.Add(c);
+                    }
+                k.Assumptions = set;
+                return new StrExpr("Assuming " + string.Join("; ", set.Describe()) + ".");
+            });
+        AddLazy("forget", Assume, "forget(x, ...)  ·  forget()", "Removes assumptions about the given variables (all of them without arguments).", "forget(x)", 0, 10, (k, raw) =>
+        {
+            if (raw.Count == 0) { k.Assumptions = AssumptionSet.Empty; return new StrExpr("All assumptions removed."); }
+            var set = k.Assumptions;
+            foreach (var r in raw)
+            {
+                if (r is not Sym s) throw new MathException("forget: expected variable names.");
+                set = set.Without(s.Name);
+            }
+            k.Assumptions = set;
+            return new StrExpr("Forgot assumptions about " + string.Join(", ", raw) + ".");
+        });
+        Add("assumptions", Assume, "assumptions()", "Lists the assumptions in effect.", "assumptions()", 0, 0, (k, a) =>
+        {
+            var lines = k.Assumptions.Describe().ToList();
+            return new StrExpr(lines.Count == 0 ? "No assumptions." : string.Join("\n", lines));
+        });
+        Add("refine", Assume, "refine(expr, x > 0, ...)", "Re-evaluates an expression under the current (plus extra) assumptions: sqrt(x^2) → x, abs, sign, (−1)^(2n), sin(n π), ...",
+            "refine(sqrt(x^2)*abs(y), x > 0, y < 0)", 1, 10, (k, a) => WithConditions(a.Skip(1), () => Assumptions.Refine(a[0])));
+        Add("is", Assume, "is(condition)", "Decides a condition from the assumptions: True, False or Unknown.", "is(x^2 + 1 > 0)", 1, 1, (k, a) =>
+            a[0] is Sym { Name: "True" or "False" } ? a[0] : new Sym("Unknown"));
         Add("expand", Alg, "expand(expr)", "Multiplies out products and powers.", "expand((x + 1)^3)", 1, 1, (k, a) => Expansion.Expand(a[0]));
         Add("factor", Alg, "factor(expr)", "Factors polynomials and rational functions over the rationals.", "factor(x^3 - 6x^2 + 11x - 6)", 1, 1,
             (k, a) => Factoring.Factor(a[0]));
@@ -379,18 +419,19 @@ public static class Builtins
         Add("linsolve", LinAlg, "linsolve(A, b)", "Solves the linear system A·x = b.", "linsolve([[2, 1], [1, 3]], [3, 5])", 2, 2, (k, a) => LinearAlgebra.LinSolve(a[0], a[1]));
 
         // Lists & statistics
-        Add("table", Lists, "table(expr, i, a, b)  ·  table(expr, i, a, b, step)", "List of expr for i from a to b.", "table(i^2, i, 1, 10)", 4, 5, (k, a) =>
+        AddLazy("table", Lists, "table(expr, i, a, b)  ·  table(expr, i, a, b, step)", "List of expr for i from a to b.", "table(i^2, i, 1, 10)", 4, 5, (k, raw) =>
         {
-            var i = Var(a[1], "table");
-            var lo = a[2]; var hi = a[3]; var step = a.Length > 4 ? a[4] : Expr.One;
+            if (raw[1] is not Sym { IsSpecial: false } i) throw new MathException("table: expected a variable name as the second argument.");
+            var lo = k.Eval(raw[2]); var hi = k.Eval(raw[3]); var step = raw.Count > 4 ? k.Eval(raw[4]) : Expr.One;
             double dlo = Dbl(lo, "Start"), dhi = Dbl(hi, "End"), ds = Dbl(step, "Step");
             if (ds == 0 || (dhi - dlo) / ds > 100000) throw new MathException("table: too many elements.");
             var items = new List<Expr>();
             int count = (int)Math.Floor((dhi - dlo) / ds + 1e-9) + 1;
+            // Evaluate the body for each value, so that commands like prime(n) see a number.
             for (int j = 0; j < count; j++)
-                items.Add(k.WithShadowed([], () => a[0].Substitute(i, lo + step * j)));
+                items.Add(k.EvalWith(i.Name, lo + step * j, raw[0]));
             return Expr.List(items);
-        }, 1);
+        });
         Add("range", Lists, "range(n)  ·  range(a, b)  ·  range(a, b, step)", "Arithmetic sequence as a list.", "range(0, 1, 1/4)", 1, 3, (k, a) =>
         {
             Expr lo = a.Length == 1 ? Expr.One : a[0], hi = a.Length == 1 ? a[0] : a[1], step = a.Length > 2 ? a[2] : Expr.One;
@@ -488,6 +529,18 @@ public static class Builtins
         return $"No help for '{name}'.";
     }
 
+    /// <summary>Runs body with the current assumptions extended by the given conditions.</summary>
+    private static Expr WithConditions(IEnumerable<Expr> conditions, Func<Expr> body)
+    {
+        var set = Assumptions.Current;
+        foreach (var c in conditions)
+        {
+            if (c is Sym { Name: "False" }) throw new MathException("The condition contradicts the current assumptions.");
+            set = set.Add(c);
+        }
+        using (Assumptions.Scope(set)) return body();
+    }
+
     private static Sym MainVariable(Expr p, Expr q, string fn)
     {
         var syms = p.FreeSymbols().Union(q.FreeSymbols()).ToList();
@@ -557,7 +610,8 @@ public static class Builtins
         var e = Expansion.Expand(z);
         if (e is ListExpr l) return Expr.List(l.Items.Select(i => ComplexPart(i, real)));
         var c = PolyView.Coefficients(e, Expr.I);
-        if (c is null) return Expr.Call(real ? "re" : "im", z);
+        // The split into real and imaginary parts is only valid when every coefficient is real.
+        if (c is null || c.Any(t => !t.IsNumber && !Assumptions.IsReal(t))) return Expr.Call(real ? "re" : "im", z);
         // Reduce powers of I: sum c_k I^k
         Expr re = Expr.Zero, im = Expr.Zero;
         for (int k = 0; k < c.Count; k++)
