@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Equator.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Equator">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="N" Modifiers="Control" Invoked="NewAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenAccelerator_Invoked" />
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveAccelerator_Invoked" />
+            <KeyboardAccelerator Key="F5" Invoked="EvaluateAllAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Escape" Modifiers="Control" Invoked="AbortAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Add" Modifiers="Control" Invoked="ZoomInAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Subtract" Modifiers="Control" Invoked="ZoomOutAccelerator_Invoked" />
+            <KeyboardAccelerator Key="F1" Invoked="HelpAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
+
+        <!-- Title bar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="14,0,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="22" Height="22" CornerRadius="5" Background="{ThemeResource AccentFillColorDefaultBrush}">
+                    <TextBlock Text="∫" FontFamily="Cambria Math" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Margin="0,-2,0,0" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
+                <TextBlock Text="Equator" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                <TextBlock x:Name="DocumentTitle" Text="Untitled" VerticalAlignment="Center"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Commands -->
+        <CommandBar Grid.Row="1" HorizontalAlignment="Left" DefaultLabelPosition="Right" Margin="4,0,0,2" Background="Transparent">
+            <AppBarButton Label="New" Click="New_Click" ToolTipService.ToolTip="New notebook (Ctrl+N)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8A5;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Open" Click="Open_Click" ToolTipService.ToolTip="Open notebook (Ctrl+O)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8E5;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Save" Click="Save_Click" ToolTipService.ToolTip="Save notebook (Ctrl+S)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE74E;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarButton Label="Evaluate all" Click="EvaluateAll_Click" ToolTipService.ToolTip="Evaluate every cell in order (F5)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="AbortButton" Label="Abort" Click="Abort_Click" IsEnabled="False" ToolTipService.ToolTip="Abort the running evaluation (Ctrl+Esc)">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE71A;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Clear outputs" Click="ClearOutputs_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE894;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton Label="Restart kernel" Click="Restart_Click" ToolTipService.ToolTip="Forget all variables, functions and history">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE72C;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarSeparator />
+            <AppBarButton Label="Add cell" Click="AddCell_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE710;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <CommandBar.SecondaryCommands>
+                <AppBarButton Label="Zoom in" Click="ZoomIn_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8A3;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Zoom out" Click="ZoomOut_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE71F;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Toggle light/dark theme" Click="Theme_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE793;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarSeparator />
+                <AppBarButton Label="Load examples" Click="Examples_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE734;" /></AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton Label="Keyboard shortcuts" Click="Help_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE765;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar.SecondaryCommands>
+        </CommandBar>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Notebook -->
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,1,0" CornerRadius="0,8,0,0">
+                <ScrollViewer x:Name="NotebookScroller" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="CellsPanel" MaxWidth="1180" Spacing="4" Padding="6,14,20,200" />
+                </ScrollViewer>
+            </Border>
+
+            <!-- Side panel -->
+            <Grid Grid.Column="1" Padding="14,4,14,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <SelectorBar x:Name="SidePanelSelector" SelectionChanged="SidePanelSelector_SelectionChanged">
+                    <SelectorBarItem x:Name="FunctionsTab" Text="Functions" IsSelected="True" />
+                    <SelectorBarItem x:Name="VariablesTab" Text="Variables" />
+                    <SelectorBarItem x:Name="GuideTab" Text="Guide" />
+                </SelectorBar>
+
+                <Grid x:Name="FunctionsPanel" Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Symbols" Style="{StaticResource PanelHeader}" />
+                    <StackPanel x:Name="SymbolsPanel" Grid.Row="1" Spacing="4" />
+                    <AutoSuggestBox x:Name="FunctionSearch" Grid.Row="2" Margin="0,14,0,8" PlaceholderText="Search functions"
+                                    QueryIcon="Find" TextChanged="FunctionSearch_TextChanged" />
+                    <ListView x:Name="FunctionList" Grid.Row="3" SelectionMode="None" IsItemClickEnabled="True"
+                              ItemClick="FunctionList_ItemClick" Padding="0,0,0,12" />
+                </Grid>
+
+                <Grid x:Name="VariablesPanel" Grid.Row="1" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Defined in this session" Style="{StaticResource PanelHeader}" />
+                    <ListView x:Name="VariableList" Grid.Row="1" SelectionMode="None" />
+                </Grid>
+
+                <ScrollViewer x:Name="GuidePanel" Grid.Row="1" Visibility="Collapsed">
+                    <StackPanel x:Name="GuideContent" Spacing="6" Padding="0,8,8,24" />
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- Status bar -->
+        <Grid Grid.Row="3" Padding="14,5" Background="{ThemeResource LayerFillColorDefaultBrush}"
+              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" />
+                <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <TextBlock x:Name="StatusRight" HorizontalAlignment="Right" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                       Text="Shift+Enter evaluate · Alt+Enter evaluate and insert · ↑/↓ move between cells" />
+        </Grid>
+    </Grid>
+</Window>

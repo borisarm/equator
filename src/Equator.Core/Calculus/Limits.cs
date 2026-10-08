@@ -1,0 +1,313 @@
+using Equator.Core.Algebra;
+using Equator.Core.Numerics;
+
+namespace Equator.Core.Calculus;
+
+/// <summary>
+/// Limits by structural recursion (continuity), L'Hôpital's rule for indeterminate quotients, rewriting of
+/// 0·∞, ∞−∞ and exponential forms, with a numeric fallback that recognises simple closed forms.
+/// </summary>
+public static class Limits
+{
+    /// <param name="dir">0 = two-sided, +1 = from the right (x → a⁺), −1 = from the left (x → a⁻).</param>
+    public static Expr Limit(Expr f, Expr x, Expr a, int dir = 0)
+    {
+        if (x is not Sym) throw new MathException("Limit variable must be a symbol.");
+        if (f.FreeOf(x)) return f;
+        if (f is ListExpr l) return Expr.List(l.Items.Select(i => Limit(i, x, a, dir)));
+
+        if (a == Expr.Infinity || (a.IsInfinite && a.HasNegativeCoefficient))
+        {
+            // x -> ±∞ becomes t -> 0⁺ with x = ±1/t
+            var t = new Sym("\u0001t");
+            var g = f.Substitute(x, a == Expr.Infinity ? Expr.One / t : -Expr.One / t);
+            return Limit(g, t, Expr.Zero, +1);
+        }
+
+        if (dir == 0)
+        {
+            var right = Limit(f, x, a, +1);
+            var left = Limit(f, x, a, -1);
+            if (right == left) return right;
+            if (IsCloseNumerically(right, left)) return right;
+            return Expr.Undefined;
+        }
+
+        var r = Lim(f, x, a, dir, 0);
+        if (r is not null && r != Expr.Undefined && r != Expr.ComplexInfinity) return Clean(r);
+        var n = NumericLimit(f, x, a, dir);
+        if (n is not null) return n;
+        return r ?? FnExpr.Inert("limit", f, x, a);
+    }
+
+    private static bool IsCloseNumerically(Expr a, Expr b)
+    {
+        if (!a.IsConstant || !b.IsConstant || a.IsUndefinedOrInfinite || b.IsUndefinedOrInfinite) return false;
+        try
+        {
+            var va = NumericEval.Eval(a); var vb = NumericEval.Eval(b);
+            return System.Numerics.Complex.Abs(va - vb) < 1e-9 * (1 + System.Numerics.Complex.Abs(va));
+        }
+        catch (MathException) { return false; }
+    }
+
+    private static Expr Clean(Expr r)
+    {
+        if (r.IsInfinite) return r;
+        return Solver.Tidy(r);
+    }
+
+    private static bool Indeterminate(Expr e) => e == Expr.Undefined || e == Expr.ComplexInfinity;
+    private static bool IsInf(Expr e) => e.IsInfinite;
+
+    /// <summary>Structural limit; null when it cannot be decided this way.</summary>
+    private static Expr? Lim(Expr f, Expr x, Expr a, int dir, int depth)
+    {
+        if (depth > 25) return null;
+        Engine.Interrupt.Check();
+        if (f.FreeOf(x)) return f;
+        if (f == x) return a;
+
+        switch (f)
+        {
+            case AddExpr s:
+                {
+                    var parts = new List<Expr>();
+                    foreach (var t in s.Terms)
+                    {
+                        var lt = Lim(t, x, a, dir, depth + 1);
+                        if (lt is null || Indeterminate(lt)) return Quotient(f, x, a, dir, depth);
+                        parts.Add(lt);
+                    }
+                    var sum = Expr.Plus(parts);
+                    if (!Indeterminate(sum)) return sum;
+                    // ∞ − ∞: combine over a common denominator and try again.
+                    return Quotient(f, x, a, dir, depth);
+                }
+            case MulExpr m:
+                {
+                    var parts = new List<Expr>();
+                    bool bad = false;
+                    foreach (var t in m.Factors)
+                    {
+                        var lt = Lim(t, x, a, dir, depth + 1);
+                        if (lt is null || Indeterminate(lt)) { bad = true; break; }
+                        parts.Add(lt);
+                    }
+                    if (!bad)
+                    {
+                        var prod = Expr.Times(parts);
+                        if (!Indeterminate(prod)) return prod;
+                    }
+                    return Quotient(f, x, a, dir, depth);
+                }
+            case PowExpr p:
+                {
+                    var lb = Lim(p.Base, x, a, dir, depth + 1);
+                    var le = p.Exponent.FreeOf(x) ? p.Exponent : Lim(p.Exponent, x, a, dir, depth + 1);
+                    if (lb is not null && le is not null && !Indeterminate(lb) && !Indeterminate(le))
+                    {
+                        if (lb.IsZero && le.IsNumber && le.IsNegativeNumber)
+                        {
+                            // 1/0: sign from the side we approach on.
+                            var sign = SideSign(p.Base, x, a, dir);
+                            if (sign == 0) return Expr.ComplexInfinity;
+                            bool evenInt = le is Num { Value.IsInteger: true } k && k.Value.Num.IsEven;
+                            return evenInt || sign > 0 ? Expr.Infinity : -Expr.Infinity;
+                        }
+                        bool indeterminateForm =
+                            (lb.IsOne && IsInf(le)) || (lb.IsZero && le.IsZero) || (IsInf(lb) && le.IsZero);
+                        if (!indeterminateForm)
+                        {
+                            var v = Expr.Power(lb, le);
+                            if (!Indeterminate(v)) return v;
+                        }
+                    }
+                    if (p.Exponent.FreeOf(x)) return Quotient(f, x, a, dir, depth);
+                    // f = e^(exponent * log(base))
+                    var expo = Lim(p.Exponent * Expr.Call("log", p.Base), x, a, dir, depth + 1);
+                    if (expo is null || Indeterminate(expo)) return null;
+                    return Expr.Exp(expo);
+                }
+            case FnExpr fn when fn.Args.Count == 1:
+                {
+                    var lu = Lim(fn.Args[0], x, a, dir, depth + 1);
+                    if (lu is null || Indeterminate(lu)) return null;
+                    if (IsInf(lu))
+                    {
+                        bool pos = lu == Expr.Infinity;
+                        switch (fn.Name)
+                        {
+                            case "log": return pos ? Expr.Infinity : null;
+                            case "atan": return pos ? Expr.Pi / 2 : -Expr.Pi / 2;
+                            case "tanh": case "erf": return pos ? Expr.One : Expr.MinusOne;
+                            case "sinh": case "asinh": return pos ? Expr.Infinity : -Expr.Infinity;
+                            case "cosh": return Expr.Infinity;
+                            case "acot": return Expr.Zero;
+                            case "sqrt": return pos ? Expr.Infinity : null;
+                            case "abs": return Expr.Infinity;
+                            case "sin": case "cos": return Expr.Undefined;
+                            default: return null;
+                        }
+                    }
+                    if (fn.Name == "log" && lu.IsZero)
+                        return Expr.MinusOne * Expr.Infinity;
+                    if (fn.Name is "tan" or "sec" or "csc" or "cot" or "floor" or "ceil" or "round" or "sign" or "abs")
+                    {
+                        // Possibly discontinuous: evaluate near the point instead.
+                        return null;
+                    }
+                    var v = Expr.Call(fn.Name, lu);
+                    return Indeterminate(v) ? null : v;
+                }
+        }
+        return null;
+    }
+
+    /// <summary>Writes f as N/D and applies L'Hôpital's rule to 0/0 and ∞/∞ forms.</summary>
+    private static Expr? Quotient(Expr f, Expr x, Expr a, int dir, int depth)
+    {
+        if (depth > 25) return null;
+        var (n, d) = Rational.NumDen(Rational.Together(f));
+        if (d.FreeOf(x))
+        {
+            // 0·∞ inside a product: move the infinite factor to the denominator as its reciprocal.
+            if (f is MulExpr m && m.Factors.Count >= 2)
+            {
+                foreach (var fac in m.Factors)
+                {
+                    if (fac.FreeOf(x)) continue;
+                    var lf = Lim(fac, x, a, dir, depth + 1);
+                    if (lf is not null && lf.IsZero)
+                    {
+                        var others = Expr.Times(m.Factors.Where(z => !ReferenceEquals(z, fac)));
+                        return LHopital(others, Expr.One / fac, x, a, dir, depth);
+                    }
+                }
+            }
+            return null;
+        }
+        return LHopital(n, d, x, a, dir, depth);
+    }
+
+    private static Expr? LHopital(Expr n, Expr d, Expr x, Expr a, int dir, int depth)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            var ln = Lim(n, x, a, dir, depth + 1);
+            var ld = Lim(d, x, a, dir, depth + 1);
+            if (ln is null || ld is null) return null;
+            if (Indeterminate(ln) || Indeterminate(ld)) return null;
+            bool zeroZero = ln.IsZero && ld.IsZero;
+            bool infInf = IsInf(ln) && IsInf(ld);
+            if (!zeroZero && !infInf)
+            {
+                if (ld.IsZero)
+                {
+                    if (ln.IsZero) return null;
+                    var s = SideSign(d, x, a, dir) * NumericSign(ln);
+                    if (s == 0) return Expr.ComplexInfinity;
+                    return s > 0 ? Expr.Infinity : -Expr.Infinity;
+                }
+                var q = ln / ld;
+                return Indeterminate(q) ? null : q;
+            }
+            n = Rational.Cancel(Derivative.Diff(n, x));
+            d = Rational.Cancel(Derivative.Diff(d, x));
+            // Cancel the new quotient before the next round to avoid growth.
+            var (n2, d2) = Rational.NumDen(Rational.Cancel(n / d));
+            n = n2; d = d2;
+            if (d.FreeOf(x)) return Lim(n / d, x, a, dir, depth + 1);
+        }
+        return null;
+    }
+
+    private static int NumericSign(Expr e)
+    {
+        if (e == Expr.Infinity) return 1;
+        if (e.IsInfinite) return e.HasNegativeCoefficient ? -1 : 0;
+        try { return Math.Sign(NumericEval.EvalReal(e)); }
+        catch (MathException) { return 0; }
+    }
+
+    /// <summary>Sign of g(x) just beside a on the given side (0 when unknown).</summary>
+    private static int SideSign(Expr g, Expr x, Expr a, int dir)
+    {
+        if (!g.FreeSymbols().All(s => s == x) || !a.IsConstant) return 0;
+        try
+        {
+            var fn = NumericEval.Compile1(g, ((Sym)x).Name);
+            double av = NumericEval.EvalReal(a);
+            int sign = 0;
+            foreach (var h in new[] { 1e-6, 1e-8, 1e-10 })
+            {
+                var v = fn(av + dir * h * Math.Max(1, Math.Abs(av)));
+                if (double.IsNaN(v)) return 0;
+                int s = Math.Sign(v);
+                if (sign != 0 && s != sign) return 0;
+                sign = s;
+            }
+            return sign;
+        }
+        catch (MathException) { return 0; }
+    }
+
+    // ---- numeric fallback ------------------------------------------------------------------------
+
+    private static Expr? NumericLimit(Expr f, Expr x, Expr a, int dir)
+    {
+        if (!f.FreeSymbols().All(s => s == x) || !a.IsConstant) return null;
+        Func<double, double> fn;
+        try { fn = NumericEval.Compile1(f, ((Sym)x).Name); }
+        catch (MathException) { return null; }
+        double av;
+        try { av = NumericEval.EvalReal(a); } catch (MathException) { return null; }
+        if (double.IsNaN(av)) return null;
+
+        double scale = Math.Max(1, Math.Abs(av));
+        double F(double h) => fn(av + dir * h * scale);
+
+        var values = new List<double>();
+        for (int k = 3; k <= 9; k++) values.Add(F(Math.Pow(10, -k)));
+        if (values.Any(double.IsNaN)) return null;
+        if (values.Skip(3).All(v => Math.Abs(v) > 1e6) && values.Zip(values.Skip(1)).All(p => Math.Abs(p.Second) >= Math.Abs(p.First)))
+            return Math.Sign(values[^1]) > 0 ? Expr.Infinity : -Expr.Infinity;
+
+        // Richardson extrapolation assuming f(a + h) = L + c1 h + c2 h^2 + ...
+        double Extrapolate(double h)
+        {
+            double f1 = F(h), f2 = F(h / 2), f3 = F(h / 4);
+            double r1 = 2 * f2 - f1, r2 = 2 * f3 - f2;
+            return (4 * r2 - r1) / 3;
+        }
+        double l1 = Extrapolate(1e-3), l2 = Extrapolate(1e-4);
+        if (!double.IsFinite(l1) || !double.IsFinite(l2)) return null;
+        if (Math.Abs(l1 - l2) > 1e-6 * (1 + Math.Abs(l2)))
+        {
+            // Slowly converging (e.g. fractional powers): accept only a plainly settled sequence.
+            var last = values[^1];
+            if (Math.Abs(values[^1] - values[^2]) < 1e-7 * (1 + Math.Abs(last))) return new Real(last);
+            return null;
+        }
+        return Recognize(l2);
+    }
+
+    /// <summary>Tries to identify a floating value as a simple exact constant.</summary>
+    public static Expr Recognize(double v)
+    {
+        if (Math.Abs(v) < 1e-9) return Expr.Zero;
+        Expr? Try(double target, Func<BigRational, Expr> build)
+        {
+            if (!double.IsFinite(target)) return null;
+            var r = BigRational.FromDouble(target, 200);
+            if (Math.Abs(r.ToDouble() - target) < 1e-9 * (1 + Math.Abs(target))) return build(r);
+            return null;
+        }
+        return Try(v, r => new Num(r))
+            ?? Try(v / Math.PI, r => new Num(r) * Expr.Pi)
+            ?? Try(v * v, r => r.Sign > 0 ? (v < 0 ? -Expr.Sqrt(new Num(r)) : Expr.Sqrt(new Num(r))) : new Real(v))
+            ?? Try(Math.Log(Math.Abs(v)), r => (v < 0 ? -Expr.One : Expr.One) * Expr.Exp(new Num(r)))
+            ?? Try(v / Math.E, r => new Num(r) * Expr.E)
+            ?? (Expr)new Real(v);
+    }
+}
