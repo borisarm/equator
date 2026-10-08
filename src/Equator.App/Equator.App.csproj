@@ -12,14 +12,39 @@
     <RuntimeIdentifier Condition="'$(Platform)' == 'x64'">win-x64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
-    <WindowsPackageType>None</WindowsPackageType>
     <EnableMsixTooling>true</EnableMsixTooling>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <!-- dotnet build/run and the portable publish produce an unpackaged app; pass -p:EquatorPackaged=true for MSIX. -->
+    <EquatorPackaged Condition="'$(EquatorPackaged)' == ''">false</EquatorPackaged>
   </PropertyGroup>
+
+  <!-- Unpackaged: runs straight from the build folder, carries the Windows App SDK runtime with it. -->
+  <PropertyGroup Condition="'$(EquatorPackaged)' != 'true'">
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <!--
+    MSIX for the Microsoft Store. The Windows App SDK runtime is a framework dependency that the Store installs
+    automatically; .NET is carried inside the package. Builds an unsigned .msix (the Store signs it) and a
+    .msixupload for Partner Center. See tools/package.ps1.
+  -->
+  <PropertyGroup Condition="'$(EquatorPackaged)' == 'true'">
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <UapAppxPackageBuildMode>StoreUpload</UapAppxPackageBuildMode>
+    <!-- Symbol packages need Visual Studio's MSBuild; the dotnet CLI build skips them. -->
+    <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+    <GenerateTestArtifacts>false</GenerateTestArtifacts>
+    <AppxPackageDir>$(MSBuildThisFileDirectory)..\..\AppPackages\</AppxPackageDir>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
@@ -27,6 +52,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\Equator.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EquatorPackaged)' == 'true'">
+    <AppxManifest Include="Package.appxmanifest" SubType="Designer" />
+    <Content Include="Assets\Package\*.png" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EquatorPackaged)' != 'true'">
+    <None Include="Package.appxmanifest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Equator.Core\Equator.Core.csproj" />

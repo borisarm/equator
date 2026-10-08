@@ -5,3 +5,5 @@ obj/
 TestResults/
 publish/
 models/
+AppPackages/
+__pycache__/

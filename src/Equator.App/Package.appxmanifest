@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX package manifest for the Microsoft Store. The identity values come from Partner Center
+  (Product management → Product identity) and must match it exactly.
+  Bump Version for every submission (the last field must stay 0).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="25433BorisArmenta.EquatorSolver"
+    Publisher="CN=991E5DC7-7C6A-44B8-9614-FDF783EE4452"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>Equator</DisplayName>
+    <PublisherDisplayName>Boris Armenta</PublisherDisplayName>
+    <Logo>Assets\Package\StoreLogo.png</Logo>
+    <Description>A notebook computer algebra system: exact algebra, calculus, equation solving, plots, arbitrary precision, and checking of handwritten worked solutions.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="Equator"
+        Description="Computer algebra notebook: algebra, calculus, plots and checking of handwritten work."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Package\Square150x150Logo.png"
+        Square44x44Logo="Assets\Package\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Package\Wide310x150Logo.png"
+                         Square71x71Logo="Assets\Package\SmallTile.png"
+                         Square310x310Logo="Assets\Package\LargeTile.png"
+                         ShortName="Equator">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+            <uap:ShowOn Tile="square310x310Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\Package\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- Double-clicking a notebook opens it in Equator. -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="equatornotebook">
+            <uap:DisplayName>Equator notebook</uap:DisplayName>
+            <uap:Logo>Assets\Package\Square44x44Logo.png</uap:Logo>
+            <uap:InfoTip>Equator notebook</uap:InfoTip>
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="application/json">.eqnb</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Win32 (WinUI 3) desktop app. -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- Only used to download the handwriting model once, on request (Check work → Download). -->
+    <Capability Name="internetClient" />
+  </Capabilities>
+</Package>

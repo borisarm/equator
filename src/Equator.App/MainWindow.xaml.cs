@@ -40,8 +40,7 @@ public sealed partial class MainWindow : Window
         BuildGuide();
         RefreshVariables([]);
 
-        var args = Environment.GetCommandLineArgs();
-        if (args.Length > 1 && File.Exists(args[1])) _ = OpenPathAsync(args[1], evaluate: true);
+        if (StartupFile() is { } startupFile) _ = OpenPathAsync(startupFile, evaluate: true);
         else LoadCells(Examples.Welcome, evaluate: true);
         AppWindow.Closing += OnClosing;
         Closed += (_, _) => _host.Dispose();
@@ -57,6 +56,28 @@ public sealed partial class MainWindow : Window
             _snapshotTimer.Tick += async (_, _) => await SnapshotAsync(snapPath);
             _snapshotTimer.Start();
         }
+    }
+
+    /// <summary>
+    /// The notebook to open at startup: from file activation (double-clicking an .eqnb when installed as a
+    /// package) or from the command line (unpackaged).
+    /// </summary>
+    private static string? StartupFile()
+    {
+        try
+        {
+            var activation = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
+            if (activation.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.File
+                && activation.Data is Windows.ApplicationModel.Activation.IFileActivatedEventArgs fileArgs
+                && fileArgs.Files.FirstOrDefault() is { } item && File.Exists(item.Path))
+                return item.Path;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            App.Log("activation arguments unavailable: " + ex.Message);
+        }
+        var args = Environment.GetCommandLineArgs();
+        return args.Length > 1 && File.Exists(args[1]) ? args[1] : null;
     }
 
     private void ResizeAndCenter(int width, int height)
