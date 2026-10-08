@@ -147,6 +147,7 @@ public static class NumericEval
     {
         if (x == Math.Floor(x) && x <= 0) return double.NaN;
         if (x < 0.5) return Math.PI / (Math.Sin(Math.PI * x) * Gamma(1 - x));
+        if (x > 171.7) return double.PositiveInfinity;
         if (x == Math.Floor(x) && x < 171)
         {
             double f = 1;

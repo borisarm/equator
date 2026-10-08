@@ -16,7 +16,11 @@ public static class Integrator
     {
         if (x is not Sym) throw new MathException("Integration variable must be a symbol.");
         var r = Integrate(f, x, 0);
-        return r is null ? null : Tidy(r);
+        if (r is null) return null;
+        r = Tidy(r);
+        // The heuristics above can be fooled by substitutions that only hold on part of the real line
+        // (e.g. x = sqrt(t)); never return a result that does not differentiate back to the integrand.
+        return Verification.IsAntiderivative(r, f, x) ? r : null;
     }
 
     /// <summary>Antiderivatives read best expanded (2x sin(x) + 2cos(x) rather than 2(x sin(x) + cos(x))).</summary>
@@ -99,6 +103,12 @@ public static class Integrator
                         return n.IsNumber && n is Num { Value.IsMinusOne: true }
                             ? Expr.Call("log", b) / a
                             : Expr.Power(b, n + 1) / ((n + 1) * a);
+                    // (L^m)^n with L linear, e.g. sqrt(x^2) = |x|: d/dx[L (L^m)^n] = a (m n + 1) (L^m)^n.
+                    if (b is PowExpr { Base: var L, Exponent: Num m } && LinearSlope(L, x) is { } aL && n is Num nn)
+                    {
+                        var mn = m.Value * nn.Value;
+                        if (mn != BigRational.MinusOne) return L * f / (new Num(mn + 1) * aL);
+                    }
                     if (b is FnExpr fb && fb.Args.Count == 1 && LinearSlope(fb.Args[0], x) is { } a2)
                     {
                         var u = fb.Args[0];
@@ -574,14 +584,18 @@ public static class Integrator
     {
         bool numericOnly = f.FreeSymbols().All(s => s == x) && a.IsConstant && b.IsConstant;
         (double Value, double Error)? numeric = null;
+        double lo = double.NaN, hi = double.NaN;
         if (numericOnly)
         {
             try
             {
+                lo = Bound(a); hi = Bound(b);
+                // A non-integrable singularity makes quadrature and F(b) - F(a) both meaningless (∫ 1/x over [-1, 1]).
+                var cuts = CheckSingularities(f, (Sym)x, Math.Min(lo, hi), Math.Max(lo, hi));
                 var fn = NumericEval.Compile1(f, ((Sym)x).Name);
-                numeric = NumericMethods.Integrate(fn, NumericEval.EvalReal(a), NumericEval.EvalReal(b));
+                numeric = PiecewiseQuadrature(fn, lo, hi, cuts);
             }
-            catch (MathException) { }
+            catch (MathException ex) when (ex is not DivergenceException) { }
         }
 
         var F = Antiderivative(f, x);
@@ -595,14 +609,12 @@ public static class Integrator
                 if (numeric is null) return value;
                 var (nv, err) = numeric.Value;
                 if (value.IsInfinite) return value;
-                try
-                {
-                    var check = NumericEval.Eval(value);
-                    if (Math.Abs(check.Imaginary) < 1e-9 && Math.Abs(check.Real - nv) <= 1e-6 * (1 + Math.Abs(nv)) && err < 1e-6 * (1 + Math.Abs(nv)))
-                        return value;
-                }
-                catch (MathException) { }
+                if (Agrees(value, nv, err)) return value;
             }
+            // F may jump inside the interval (e.g. antiderivatives from the tan(x/2) substitution): split there.
+            if (numeric is { } target && double.IsFinite(lo) && double.IsFinite(hi) && SplitAtJumps(F, (Sym)x, a, b, lo, hi) is { } split
+                && Agrees(split, target.Value, target.Error))
+                return split;
         }
         if (numeric is { } nres)
         {
@@ -615,4 +627,166 @@ public static class Integrator
     }
 
     private static bool HasRealCoefficients(Expr e) => e.ContainsAny(z => z is Real);
+
+    private static double Bound(Expr e)
+    {
+        if (e == Expr.Infinity) return double.PositiveInfinity;
+        if (e.IsInfinite && e.HasNegativeCoefficient) return double.NegativeInfinity;
+        var v = NumericEval.EvalReal(e);
+        if (double.IsNaN(v)) throw new MathException("Integration limits must be real.");
+        return v;
+    }
+
+    private static bool Agrees(Expr value, double nv, double err)
+    {
+        try
+        {
+            var check = NumericEval.Eval(value);
+            return Math.Abs(check.Imaginary) < 1e-9 * (1 + Math.Abs(nv)) && Math.Abs(check.Real - nv) <= 1e-6 * (1 + Math.Abs(nv)) && err < 1e-6 * (1 + Math.Abs(nv));
+        }
+        catch (MathException) { return false; }
+    }
+
+    /// <summary>Thrown when an integral is known to diverge.</summary>
+    public sealed class DivergenceException() : MathException("The integral diverges.");
+
+    /// <summary>
+    /// Finds the points of [lo, hi] where f may be singular (zeros of denominators, of log arguments and of
+    /// the cos/sin behind tan, sec, cot, csc) and throws when f is not integrable at one of them.
+    /// </summary>
+    private static List<double> CheckSingularities(Expr f, Sym x, double lo, double hi)
+    {
+        var suspects = new List<Expr>();
+        var (_, den) = Rational.NumDen(Rational.Together(f));
+        if (!den.FreeOf(x)) suspects.Add(den);
+        foreach (var s in f.Subexpressions())
+        {
+            switch (s)
+            {
+                case FnExpr { Name: "log" } lg when !lg.Args[0].FreeOf(x): suspects.Add(lg.Args[0]); break;
+                case FnExpr { Name: "tan" or "sec" } t when !t.Args[0].FreeOf(x): suspects.Add(Expr.Call("cos", t.Args[0])); break;
+                case FnExpr { Name: "cot" or "csc" } t when !t.Args[0].FreeOf(x): suspects.Add(Expr.Call("sin", t.Args[0])); break;
+                case PowExpr { Exponent: var e } p when e.IsNegativeNumber && !p.Base.FreeOf(x): suspects.Add(p.Base); break;
+            }
+        }
+        var fn = NumericEval.Compile1(f, x.Name);
+        var interior = new List<double>();
+        foreach (var g in suspects.Distinct())
+            foreach (var c in RealZeros(g, x, lo, hi))
+            {
+                if (!Integrable(fn, c, lo, hi)) throw new DivergenceException();
+                if (c > lo && c < hi && !interior.Any(p => Math.Abs(p - c) < 1e-12 * (1 + Math.Abs(c)))) interior.Add(c);
+            }
+        interior.Sort();
+        return interior;
+    }
+
+    /// <summary>Quadrature split at interior singular points, so that each piece only has endpoint singularities.</summary>
+    private static (double Value, double Error) PiecewiseQuadrature(Func<double, double> fn, double lo, double hi, List<double> cuts)
+    {
+        if (cuts.Count == 0 || !double.IsFinite(lo) || !double.IsFinite(hi)) return NumericMethods.Integrate(fn, lo, hi);
+        var points = new List<double> { Math.Min(lo, hi) };
+        points.AddRange(cuts);
+        points.Add(Math.Max(lo, hi));
+        double value = 0, error = 0;
+        for (int i = 0; i + 1 < points.Count; i++)
+        {
+            // Each piece has a singular endpoint: tanh-sinh handles those to full precision.
+            var (v, e) = NumericMethods.TanhSinh(fn, points[i], points[i + 1]);
+            if (!double.IsFinite(v) || e > 1e-8 * (1 + Math.Abs(v))) (v, e) = NumericMethods.Integrate(fn, points[i], points[i + 1]);
+            value += v; error += e;
+        }
+        return lo <= hi ? (value, error) : (-value, error);
+    }
+
+    private static IEnumerable<double> RealZeros(Expr g, Sym x, double lo, double hi)
+    {
+        var found = new List<double>();
+        bool exact = false;
+        try
+        {
+            var sols = Solver.SolveFor(g, x, out var numeric);
+            exact = !numeric;
+            foreach (var s in sols)
+            {
+                if (!s.IsConstant) continue;
+                var v = NumericEval.Eval(s);
+                if (Math.Abs(v.Imaginary) < 1e-12 * (1 + Math.Abs(v.Real))) found.Add(v.Real);
+            }
+        }
+        catch (MathException) { }
+        // Periodic zeros (cos(x) = 0) are only reported once by the solver; scan finite intervals as well.
+        if ((!exact || g.ContainsAny(z => z is FnExpr { Name: "sin" or "cos" })) && double.IsFinite(lo) && double.IsFinite(hi))
+        {
+            try { found.AddRange(NumericMethods.RealRoots(NumericEval.Compile1(g, x.Name), lo, hi, 4000)); }
+            catch (MathException) { }
+        }
+        return found.Where(v => v >= lo - 1e-12 && v <= hi + 1e-12);
+    }
+
+    /// <summary>Heuristic: f is integrable at c when h·|f(c ± h)| tends to zero.</summary>
+    private static bool Integrable(Func<double, double> fn, double c, double lo, double hi)
+    {
+        double scale = Math.Max(1, Math.Abs(c));
+        foreach (var side in new[] { -1, 1 })
+        {
+            if ((side < 0 && c <= lo) || (side > 0 && c >= hi)) continue;
+            double G(double h) => h * Math.Abs(fn(c + side * h * scale));
+            double g4 = G(1e-4), g6 = G(1e-6), g8 = G(1e-8);
+            if (double.IsNaN(g4) || double.IsNaN(g6) || double.IsNaN(g8)) continue;
+            if (double.IsInfinity(g8) || (g8 > 1e-12 && g8 > 0.3 * g6 && g6 > 0.3 * g4)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Locates jump discontinuities of F in (a, b), identifies them exactly and sums F over the pieces with
+    /// one-sided limits. Null when a jump cannot be identified.
+    /// </summary>
+    private static Expr? SplitAtJumps(Expr F, Sym x, Expr a, Expr b, double lo, double hi)
+    {
+        Func<double, double> Fn;
+        try { Fn = NumericEval.Compile1(F, x.Name); }
+        catch (MathException) { return null; }
+        const int N = 2000;
+        var t = new double[N + 1];
+        var v = new double[N + 1];
+        for (int i = 0; i <= N; i++) { t[i] = lo + (hi - lo) * i / N; v[i] = Fn(t[i]); }
+        var diffs = new List<double>();
+        for (int i = 0; i < N; i++) if (double.IsFinite(v[i]) && double.IsFinite(v[i + 1])) diffs.Add(Math.Abs(v[i + 1] - v[i]));
+        if (diffs.Count < N / 2) return null;
+        diffs.Sort();
+        double typical = diffs[diffs.Count / 2] + 1e-12;
+
+        var cuts = new List<Expr>();
+        for (int i = 0; i < N; i++)
+        {
+            if (!double.IsFinite(v[i]) || !double.IsFinite(v[i + 1])) continue;
+            if (Math.Abs(v[i + 1] - v[i]) < 50 * typical || Math.Abs(v[i + 1] - v[i]) < 1e-6) continue;
+            double l = t[i], r = t[i + 1], fl = v[i];
+            for (int k = 0; k < 60; k++)
+            {
+                double m = (l + r) / 2, fm = Fn(m);
+                if (Math.Abs(fm - fl) < Math.Abs(v[i + 1] - v[i]) / 2) { l = m; fl = fm; } else r = m;
+            }
+            var c = Limits.Recognize((l + r) / 2);
+            if (c is Real) return null;
+            if (!cuts.Contains(c)) cuts.Add(c);
+            if (cuts.Count > 20) return null;
+        }
+        if (cuts.Count == 0) return null;
+        var points = new List<Expr> { a };
+        points.AddRange(lo <= hi ? cuts : Enumerable.Reverse(cuts));
+        points.Add(b);
+        var pieces = new List<Expr>();
+        for (int i = 0; i + 1 < points.Count; i++)
+        {
+            int dirHi = lo <= hi ? -1 : 1;
+            var up = Limits.Limit(F, x, points[i + 1], dirHi);
+            var down = Limits.Limit(F, x, points[i], -dirHi);
+            if (up.IsUndefinedOrInfinite || down.IsUndefinedOrInfinite) return null;
+            pieces.Add(up - down);
+        }
+        return Simplifier.Simplify(Expr.Plus(pieces));
+    }
 }

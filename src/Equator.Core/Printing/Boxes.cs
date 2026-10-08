@@ -106,7 +106,7 @@ public static class BoxFormatter
             case DMatrix m:
                 return new FenceBox(new GridBox(m.Rows.Select(r => (IReadOnlyList<Box>)r.Select(x => Build(x)).ToList()).ToList()), '(', ')');
             case DEq q:
-                return new RowBox([Build(q.Lhs, 1), Op(q.Op switch { "<=" => "≤", ">=" => "≥", "!=" => "≠", var o => o }), Build(q.Rhs, 1)]);
+                return new RowBox([Build(q.Lhs, q.Lhs is DEq ? 0 : 1), Op(q.Op switch { "<=" => "≤", ">=" => "≥", "!=" => "≠", var o => o }), Build(q.Rhs, 1)]);
             case DIntegral i:
                 return new RowBox([
                     new BigOpBox("∫", i.Lower is null ? null : Build(i.Lower), i.Upper is null ? null : Build(i.Upper), false),

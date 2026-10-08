@@ -170,6 +170,17 @@ public sealed class Kernel
                     return Expr.Power(b, x);
                 }
             case "@eq": return Expr.Equation(Eval(a[0]), Eval(a[1]));
+            case "@rel" when a[1] is FnExpr { Name: "@rel" } chain:
+                {
+                    // a op1 m op2 b holds when both comparisons hold.
+                    var inner = EvalSpecial(chain);
+                    var middle = inner is FnExpr { Name: "@rel" } ir ? ir.Args[2] : Eval(chain.Args[2]);
+                    var outer = Relation(((StrExpr)a[0]).Value, middle, Eval(a[2]));
+                    if (inner is Sym { Name: "False" } || outer is Sym { Name: "False" }) return new Sym("False");
+                    if (inner is Sym { Name: "True" }) return outer;
+                    if (outer is Sym { Name: "True" }) return inner;
+                    return FnExpr.Inert("@rel", a[0], inner, ((FnExpr)outer).Args[2]);
+                }
             case "@rel": return Relation(((StrExpr)a[0]).Value, Eval(a[1]), Eval(a[2]));
             case "@list": return Expr.List(a.Select(Eval));
             case "@index": return Index(Eval(a[0]), a.Skip(1).Select(Eval).ToList());

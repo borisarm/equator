@@ -366,7 +366,19 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
 
         if (factors.Any(f => f == Infinity || f == ComplexInfinity))
         {
-            // Numeric coefficients only contribute their sign next to an infinity.
+            // Numeric coefficients only contribute their sign next to an infinity; so do real constants
+            // such as log(2), pi or sqrt(2) (∞·log(2) = ∞).
+            for (int i = factors.Count - 1; i >= 0; i--)
+            {
+                var f = factors[i];
+                if (f == Infinity || f == ComplexInfinity || !f.IsConstant || f.IsUndefinedOrInfinite) continue;
+                double v;
+                try { v = Numerics.NumericEval.EvalReal(f); }
+                catch (MathException) { continue; }
+                if (double.IsNaN(v) || v == 0 || double.IsInfinity(v)) continue;
+                if (v < 0) q = -q;
+                factors.RemoveAt(i);
+            }
             double sign = Math.Sign(q.ToDouble() * (r ?? 1));
             q = sign < 0 ? BigRational.MinusOne : BigRational.One;
             r = null;
@@ -567,7 +579,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
     }
 }
 
-public sealed class MathException(string message) : Exception(message);
+public class MathException(string message) : Exception(message);
 
 // ---- node types -------------------------------------------------------------------------------
 

@@ -152,7 +152,9 @@ public static class Solver
 
         if (!solvedAll)
         {
-            candidates = NumericSolve(f, x);
+            // A scan finds roots but cannot prove there are no others, so this stays flagged as numeric
+            // even when every root snaps to an exact value.
+            candidates = NumericSolve(f, x).Select(s => SnapToExact(f, x, s)).ToList();
             numeric = true;
         }
 
@@ -225,7 +227,147 @@ public static class Solver
 
         var sub = SolveBySubstitution(g, x);
         if (sub is not null) return sub;
+
+        var rad = SolveRadical(g, x);
+        if (rad is not null) return rad;
+
+        var trig = SolveTrigRational(g, x);
+        if (trig is not null) return trig;
         return null;
+    }
+
+    /// <summary>
+    /// Equations with a radical u^(1/q): write g as a polynomial G(t) in t = u^(1/q) and eliminate t with the
+    /// resultant of G(t) and t^q − u. Candidates may be spurious (squaring), so SolveFor verifies them.
+    /// </summary>
+    private static List<Expr>? SolveRadical(Expr g, Expr x)
+    {
+        var radical = g.Subexpressions()
+            .OfType<PowExpr>()
+            .Where(p => p.Exponent is Num { Value.IsInteger: false } && !p.Base.FreeOf(x))
+            .OrderByDescending(p => p.Base.Complexity())
+            .FirstOrDefault();
+        if (radical is null) return null;
+        var u = radical.Base;
+        var q = (int)((Num)radical.Exponent).Value.Den;
+        if (q > 12) return null;
+        var t = new Sym("\u0001r");
+        bool ok = true;
+        var G = g.MapBottomUp(z =>
+        {
+            if (z is PowExpr pz && pz.Base == u && pz.Exponent is Num { Value: var e })
+            {
+                var k = e * q;
+                if (k.IsInteger) return Expr.Power(t, new Num(k));
+                ok = false;
+            }
+            return z;
+        });
+        if (!ok) return null;
+        var (Gn, _) = Rational.NumDen(Rational.Together(G));
+        var coeffs = PolyView.Coefficients(Gn, t);
+        if (coeffs is null || coeffs.Count < 2 || coeffs.Count > 7) return null;
+        // t^q − u as a coefficient list.
+        var root = Enumerable.Repeat((Expr)Expr.Zero, q + 1).ToList();
+        root[0] = -u; root[q] = Expr.One;
+        var res = Expansion.Expand(Resultant(coeffs, root));
+        if (res.IsZero || res.FreeOf(x) || res.Contains(t)) return null;
+        try
+        {
+            var sols = SolveFor(res, x, out var numeric);
+            return numeric ? null : sols;
+        }
+        catch (MathException) { return null; }
+    }
+
+    /// <summary>Resultant of two polynomials given by coefficient lists (constant term first), via the Sylvester matrix.</summary>
+    public static Expr Resultant(IReadOnlyList<Expr> a, IReadOnlyList<Expr> b)
+    {
+        int m = a.Count - 1, n = b.Count - 1;
+        int size = m + n;
+        var s = new Expr[size, size];
+        for (int i = 0; i < size; i++) for (int j = 0; j < size; j++) s[i, j] = Expr.Zero;
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j <= m; j++) s[i, i + j] = a[m - j];
+        for (int i = 0; i < m; i++)
+            for (int j = 0; j <= n; j++) s[n + i, i + j] = b[n - j];
+        return LinearAlgebra.Determinant(LinearAlgebra.FromArray(s));
+    }
+
+    /// <summary>
+    /// Equations rational in sin, cos, tan, ... of a single argument u: substitute T = tan(u/2) (Weierstrass),
+    /// solve the polynomial in T and map back with u = 2 atan(T), plus u = π (T = ∞). Gives the solutions
+    /// with u in (−π, π].
+    /// </summary>
+    private static List<Expr>? SolveTrigRational(Expr g, Expr x)
+    {
+        var trig = g.Subexpressions().OfType<FnExpr>()
+            .Where(f => f.Name is "sin" or "cos" or "tan" or "cot" or "sec" or "csc" && !f.Args[0].FreeOf(x))
+            .ToList();
+        if (trig.Count == 0) return null;
+        var u = trig[0].Args[0];
+        if (trig.Any(f => f.Args[0] != u)) return null;
+        var T = new Sym("\u0001w");
+        var one = Expr.One;
+        var T2 = Expr.Power(T, 2);
+        var map = new Dictionary<Expr, Expr>();
+        foreach (var f in trig.Distinct())
+        {
+            map[f] = f.Name switch
+            {
+                "sin" => 2 * T / (one + T2),
+                "cos" => (one - T2) / (one + T2),
+                "tan" => 2 * T / (one - T2),
+                "cot" => (one - T2) / (2 * T),
+                "sec" => (one + T2) / (one - T2),
+                _ => (one + T2) / (2 * T),
+            };
+        }
+        var h = g.Substitute(map);
+        if (!h.FreeOf(x)) return null;
+        var (hn, _) = Rational.NumDen(Rational.Together(h));
+        var roots = PolynomialRoots(Expansion.Expand(hn), T);
+        if (roots is null) return null;
+        var values = new List<Expr>();
+        var real = roots.Where(IsRealConstant).ToList();
+        foreach (var r in real.Count > 0 ? real : roots)
+            values.Add(2 * Expr.Call("atan", r));
+        // T = ∞ corresponds to u = π.
+        var atPi = Simplifier.Simplify(g.Substitute(u, Expr.Pi));
+        if (atPi.IsZero) values.Add(Expr.Pi);
+        var result = new List<Expr>();
+        foreach (var v in values)
+        {
+            var sols = Isolate(u, Tidy(v), x, 0);
+            if (sols is null) return null;
+            foreach (var s in sols) if (!result.Contains(s)) result.Add(s);
+        }
+        return result;
+    }
+
+    private static bool IsRealConstant(Expr e)
+    {
+        if (!e.IsConstant || e.IsUndefinedOrInfinite) return false;
+        try
+        {
+            var v = NumericEval.Eval(e);
+            return Math.Abs(v.Imaginary) < 1e-12 * (1 + Math.Abs(v.Real));
+        }
+        catch (MathException) { return false; }
+    }
+
+    /// <summary>Replaces numeric roots that are exactly small rationals (checked symbolically) by the exact value.</summary>
+    private static Expr SnapToExact(Expr f, Expr x, Expr s)
+    {
+        if (s is not Real r || !double.IsFinite(r.Value)) return s;
+        var q = BigRational.FromDouble(r.Value, 1000);
+        if (Math.Abs(q.ToDouble() - r.Value) > 1e-10 * (1 + Math.Abs(r.Value))) return s;
+        try
+        {
+            var v = Simplifier.Simplify(f.Substitute(x, new Num(q)));
+            return v.IsZero ? new Num(q) : s;
+        }
+        catch (MathException) { return s; }
     }
 
     /// <summary>Moves everything not containing x to the right-hand side, inverting one operation at a time.</summary>
@@ -419,6 +561,14 @@ public static class Solver
         else vars = variables is ListExpr vl ? vl.Items.ToList() : [variables];
 
         if (vars.Any(v => v is not Sym)) throw new MathException("Solve variables must be symbols.");
+
+        if (eqs.Any(e => e is FnExpr { Name: "@rel" }))
+        {
+            if (vars.Count != 1) throw new MathException("solve: inequalities can only be solved for one variable.");
+            if (eqs.Any(e => e is not FnExpr { Name: "@rel" }))
+                throw new MathException("solve: cannot mix equations and inequalities.");
+            return Inequalities.Solve(eqs.SelectMany(Inequalities.Conditions).ToList(), (Sym)vars[0]);
+        }
 
         if (eqs.Count == 1 && vars.Count == 1)
         {

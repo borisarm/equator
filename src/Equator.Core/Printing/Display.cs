@@ -266,6 +266,7 @@ public static class Display
             case "product" when a.Count == 4: return new DBigSum("product", Build(a[0]), Build(a[1]), Build(a[2]), Build(a[3]));
             case "limit" when a.Count == 3: return new DLimit(Build(a[0]), Build(a[1]), Build(a[2]));
             case "@rel" when a.Count == 3 && a[0] is StrExpr op: return new DEq(Build(a[1]), Build(a[2]), op.Value);
+            case "@eq" when a.Count == 2: return new DEq(Build(a[0]), Build(a[1]));
             case "@d" when a.Count == 2 && a[1] is Num { Value.IsInteger: true } order:
                 {
                     var n = (int)order.Value.Num;

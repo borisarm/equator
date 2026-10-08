@@ -227,6 +227,55 @@ public static class NumericMethods
         return (k * h, g * h);
     }
 
+    /// <summary>
+    /// Tanh-sinh (double exponential) quadrature on a finite interval. Its nodes cluster doubly exponentially
+    /// at the endpoints, so integrable endpoint singularities (1/sqrt(x), log(x)) converge to full precision.
+    /// </summary>
+    public static (double Value, double Error) TanhSinh(Func<double, double> f, double a, double b, double tol = 1e-13)
+    {
+        if (a == b) return (0, 0);
+        double c = (a + b) / 2, half = (b - a) / 2;
+        // Evaluate at c ± half·(1 − δ) with δ computed directly, so nodes very close to an endpoint stay distinct from it.
+        double Node(double t, out double weight)
+        {
+            double u = Math.PI / 2 * Math.Sinh(t);
+            double cu = Math.Cosh(u);
+            weight = Math.PI / 2 * Math.Cosh(t) / (cu * cu);
+            return 1 / (Math.Exp(2 * Math.Abs(u)) + 1) * 2; // 1 − tanh|u|
+        }
+        double h = 1.0, previous = double.NaN, estimate = 0;
+        double Sum(double step, bool oddOnly)
+        {
+            double s = 0;
+            for (int k = oddOnly ? 1 : 0; ; k += oddOnly ? 2 : 1)
+            {
+                double t = k * step;
+                double delta = Node(t, out var w);
+                if (w * half < 1e-300 || delta == 0) break;
+                if (k == 0)
+                {
+                    s += w * Safe(f, c);
+                    continue;
+                }
+                double xl = a + half * delta, xr = b - half * delta;
+                s += w * (Safe(f, xl) + Safe(f, xr));
+                if (t > 6) break;
+            }
+            return s;
+        }
+        double sum = Sum(h, false);
+        estimate = sum * h * half;
+        for (int level = 0; level < 10; level++)
+        {
+            sum += Sum(h / 2, true);
+            h /= 2;
+            previous = estimate;
+            estimate = sum * h * half;
+            if (level > 2 && Math.Abs(estimate - previous) <= tol * Math.Max(1, Math.Abs(estimate))) break;
+        }
+        return (estimate, Math.Abs(estimate - previous));
+    }
+
     /// <summary>Integrable endpoint singularities are never sampled by GK nodes, but guard against NaN anyway.</summary>
     private static double Safe(Func<double, double> f, double x)
     {

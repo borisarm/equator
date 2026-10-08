@@ -21,7 +21,9 @@ public static class Limits
             // x -> ±∞ becomes t -> 0⁺ with x = ±1/t
             var t = new Sym("\u0001t");
             var g = f.Substitute(x, a == Expr.Infinity ? Expr.One / t : -Expr.One / t);
-            return Limit(g, t, Expr.Zero, +1);
+            var r0 = Limit(g, t, Expr.Zero, +1);
+            // Never leak the internal variable into an unevaluated result.
+            return r0.Contains(t) ? FnExpr.Inert("limit", f, x, a) : r0;
         }
 
         if (dir == 0)
@@ -86,6 +88,8 @@ public static class Limits
                 }
             case MulExpr m:
                 {
+                    // 0 · bounded = 0 (x sin(1/x) as x → 0, sin(x)/x as x → ∞).
+                    if (ZeroTimesBounded(m, x, a, dir, depth)) return Expr.Zero;
                     var parts = new List<Expr>();
                     bool bad = false;
                     foreach (var t in m.Factors)
@@ -99,7 +103,7 @@ public static class Limits
                         var prod = Expr.Times(parts);
                         if (!Indeterminate(prod)) return prod;
                     }
-                    return Quotient(f, x, a, dir, depth);
+                    return Quotient(f, x, a, dir, depth) ?? ViaLogarithm(m, x, a, dir, depth);
                 }
             case PowExpr p:
                 {
@@ -115,6 +119,7 @@ public static class Limits
                             bool evenInt = le is Num { Value.IsInteger: true } k && k.Value.Num.IsEven;
                             return evenInt || sign > 0 ? Expr.Infinity : -Expr.Infinity;
                         }
+                        if (lb == Expr.Infinity && IsInf(le)) return le == Expr.Infinity ? Expr.Infinity : Expr.Zero;
                         bool indeterminateForm =
                             (lb.IsOne && IsInf(le)) || (lb.IsZero && le.IsZero) || (IsInf(lb) && le.IsZero);
                         if (!indeterminateForm)
@@ -146,13 +151,28 @@ public static class Limits
                             case "acot": return Expr.Zero;
                             case "sqrt": return pos ? Expr.Infinity : null;
                             case "abs": return Expr.Infinity;
+                            case "factorial": case "gamma": return pos ? Expr.Infinity : null;
                             case "sin": case "cos": return Expr.Undefined;
                             default: return null;
                         }
                     }
                     if (fn.Name == "log" && lu.IsZero)
                         return Expr.MinusOne * Expr.Infinity;
-                    if (fn.Name is "tan" or "sec" or "csc" or "cot" or "floor" or "ceil" or "round" or "sign" or "abs")
+                    if (fn.Name is "tan" or "sec" or "csc" or "cot" or "sign")
+                    {
+                        // Continuous wherever the value is finite (and, for sign, away from 0).
+                        var w = Expr.Call(fn.Name, lu);
+                        if (!w.IsUndefinedOrInfinite && !(fn.Name == "sign" && lu.IsZero) && (!w.IsConstant || IsFiniteNumber(w))) return w;
+                        if (w == Expr.ComplexInfinity && fn.Name != "sign")
+                        {
+                            // A pole: the side of approach decides the sign.
+                            var s = SideSign(f, x, a, dir);
+                            return s > 0 ? Expr.Infinity : s < 0 ? -Expr.Infinity : null;
+                        }
+                        return null;
+                    }
+                    if (fn.Name == "abs") return Expr.Call("abs", lu);
+                    if (fn.Name is "floor" or "ceil" or "round")
                     {
                         // Possibly discontinuous: evaluate near the point instead.
                         return null;
@@ -163,6 +183,111 @@ public static class Limits
         }
         return null;
     }
+
+    private static bool IsFiniteNumber(Expr e)
+    {
+        try { var v = NumericEval.Eval(e); return double.IsFinite(v.Real) && double.IsFinite(v.Imaginary); }
+        catch (MathException) { return false; }
+    }
+
+    /// <summary>True when one factor tends to 0 and every other factor stays bounded near the point.</summary>
+    private static bool ZeroTimesBounded(MulExpr m, Expr x, Expr a, int dir, int depth)
+    {
+        int zeroIndex = -1;
+        for (int i = 0; i < m.Factors.Count && zeroIndex < 0; i++)
+        {
+            if (m.Factors[i].FreeOf(x) || IsBounded(m.Factors[i])) continue;
+            var l = Lim(m.Factors[i], x, a, dir, depth + 1);
+            if (l is not null && l.IsZero) zeroIndex = i;
+        }
+        if (zeroIndex < 0) return false;
+        for (int i = 0; i < m.Factors.Count; i++)
+        {
+            if (i == zeroIndex || m.Factors[i].FreeOf(x) || IsBounded(m.Factors[i])) continue;
+            var l = Lim(m.Factors[i], x, a, dir, depth + 1);
+            if (l is null || Indeterminate(l) || l.IsInfinite) return false;
+        }
+        return true;
+    }
+
+    /// <summary>Bounded for real arguments: sin, cos, atan, tanh, erf and their sums, products and positive powers.</summary>
+    private static bool IsBounded(Expr e) => e switch
+    {
+        Num or Real => true,
+        Sym s => s.IsNumericConstant && s != Expr.I,
+        FnExpr { Name: "sin" or "cos" or "atan" or "tanh" or "erf" or "sign" or "acot" } f => !f.Args[0].Contains(Expr.I),
+        AddExpr s => s.Terms.All(IsBounded),
+        MulExpr p => p.Factors.All(IsBounded),
+        PowExpr { Exponent: Num { Value.IsInteger: true, Value.Sign: > 0 } } p => IsBounded(p.Base),
+        _ => false,
+    };
+
+    /// <summary>
+    /// For a product of factors that are positive near the point, lim f = exp(lim Σ log fᵢ). Taking logarithms
+    /// turns growth comparisons (e^x / x^100, n!/n^n) into sums that the ∞ − ∞ machinery handles; log(u!)
+    /// is replaced by Stirling's form u log u − u + log(2πu)/2 when u → ∞.
+    /// </summary>
+    private static Expr? ViaLogarithm(MulExpr m, Expr x, Expr a, int dir, int depth)
+    {
+        if (depth > 12 || !a.IsConstant || !m.FreeSymbols().All(s => s == x)) return null;
+        var logs = new List<Expr>();
+        Expr constant = Expr.One;
+        foreach (var fac in m.Factors)
+        {
+            if (fac.FreeOf(x)) { constant *= fac; continue; }
+            var lg = LogOf(fac, x, a, dir, depth);
+            if (lg is null) return null;
+            logs.Add(lg);
+        }
+        var L = Lim(Expansion.Expand(Expr.Plus(logs)), x, a, dir, depth + 1);
+        if (L is null || Indeterminate(L)) return null;
+        if (L == Expr.Infinity) return constant * Expr.Infinity;
+        if (L.IsInfinite) return Expr.Zero;
+        return constant * Expr.Exp(L);
+    }
+
+    private static Expr? LogOf(Expr fac, Expr x, Expr a, int dir, int depth)
+    {
+        switch (fac)
+        {
+            case PowExpr { Base: Sym { Name: "E" } } pe:
+                return pe.Exponent;
+            case PowExpr p when p.Base.FreeOf(x) ? p.Base.IsConstant && IsFiniteNumber(p.Base) && NumericSign(p.Base) > 0 : PositiveNear(p.Base, x, a, dir, depth):
+                {
+                    var inner = p.Base.FreeOf(x) ? Expr.Call("log", p.Base) : LogOf(p.Base, x, a, dir, depth);
+                    return inner is null ? null : p.Exponent * inner;
+                }
+            case MulExpr mm when mm.Factors.All(z => z.FreeOf(x) ? z.IsConstant && IsFiniteNumber(z) && NumericSign(z) > 0 : PositiveNear(z, x, a, dir, depth)):
+                {
+                    var parts = new List<Expr>();
+                    foreach (var z in mm.Factors)
+                    {
+                        var lz = z.FreeOf(x) ? Expr.Call("log", z) : LogOf(z, x, a, dir, depth);
+                        if (lz is null) return null;
+                        parts.Add(lz);
+                    }
+                    return Expr.Plus(parts);
+                }
+            case FnExpr { Name: "factorial" or "gamma" } g:
+                {
+                    var u = g.Name == "gamma" ? g.Args[0] - 1 : g.Args[0];
+                    if (Lim(u, x, a, dir, depth + 1) != Expr.Infinity) return null;
+                    // u > 0 here, so its logarithm may be expanded (log(1/t) = −log(t)) for cancellation.
+                    var lu = LogOf(u, x, a, dir, depth) ?? Expr.Call("log", u);
+                    return u * lu - u + (Expr.Call("log", 2 * Expr.Pi) + lu) / 2;
+                }
+        }
+        return PositiveNear(fac, x, a, dir, depth) ? Expr.Call("log", fac) : null;
+    }
+
+    /// <summary>Positivity beside the point, structurally where possible (e^u, u! with u → ∞), else numerically.</summary>
+    private static bool PositiveNear(Expr e, Expr x, Expr a, int dir, int depth) => e switch
+    {
+        PowExpr { Base: Sym { Name: "E" } } => true,
+        FnExpr { Name: "factorial" or "gamma" } g => Lim(g.Args[0], x, a, dir, depth + 1) == Expr.Infinity || SideSign(e, x, a, dir) > 0,
+        PowExpr p when PositiveNear(p.Base, x, a, dir, depth) => true,
+        _ => SideSign(e, x, a, dir) > 0,
+    };
 
     /// <summary>Writes f as N/D and applies L'Hôpital's rule to 0/0 and ∞/∞ forms.</summary>
     private static Expr? Quotient(Expr f, Expr x, Expr a, int dir, int depth)
@@ -269,7 +394,8 @@ public static class Limits
 
         var values = new List<double>();
         for (int k = 3; k <= 9; k++) values.Add(F(Math.Pow(10, -k)));
-        if (values.Any(double.IsNaN)) return null;
+        // NaN means outside the domain; ±∞ means floating-point overflow, which says nothing about the limit.
+        if (values.Any(v => !double.IsFinite(v))) return null;
         if (values.Skip(3).All(v => Math.Abs(v) > 1e6) && values.Zip(values.Skip(1)).All(p => Math.Abs(p.Second) >= Math.Abs(p.First)))
             return Math.Sign(values[^1]) > 0 ? Expr.Infinity : -Expr.Infinity;
 
@@ -286,21 +412,25 @@ public static class Limits
         {
             // Slowly converging (e.g. fractional powers): accept only a plainly settled sequence.
             var last = values[^1];
-            if (Math.Abs(values[^1] - values[^2]) < 1e-7 * (1 + Math.Abs(last))) return new Real(last);
+            if (Math.Abs(values[^1] - values[^2]) < 1e-7 * (1 + Math.Abs(last))) return Recognize(last, 1e-6);
             return null;
         }
-        return Recognize(l2);
+        // A floating-point answer is only offered when the extrapolation has clearly converged; otherwise the
+        // "limit" would just be rounding noise.
+        var exact = Recognize(l2);
+        if (exact is not Real) return exact;
+        return Math.Abs(l1 - l2) < 1e-9 * (1 + Math.Abs(l2)) ? exact : null;
     }
 
     /// <summary>Tries to identify a floating value as a simple exact constant.</summary>
-    public static Expr Recognize(double v)
+    public static Expr Recognize(double v, double tolerance = 1e-9)
     {
-        if (Math.Abs(v) < 1e-9) return Expr.Zero;
+        if (Math.Abs(v) < tolerance) return Expr.Zero;
         Expr? Try(double target, Func<BigRational, Expr> build)
         {
             if (!double.IsFinite(target)) return null;
             var r = BigRational.FromDouble(target, 200);
-            if (Math.Abs(r.ToDouble() - target) < 1e-9 * (1 + Math.Abs(target))) return build(r);
+            if (Math.Abs(r.ToDouble() - target) < tolerance * (1 + Math.Abs(target))) return build(r);
             return null;
         }
         return Try(v, r => new Num(r))

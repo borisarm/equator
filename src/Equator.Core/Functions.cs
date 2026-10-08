@@ -75,6 +75,11 @@ public static class Functions
             case "tan":
                 {
                     if (x is FnExpr { Name: "atan" } at) return at.Args[0];
+                    foreach (var (arg, value) in AtanTable)
+                    {
+                        if (x == value) return arg;
+                        if (x == -value) return -arg;
+                    }
                     var s = TrigExact(x, 0); var c = TrigExact(x, 1);
                     if (s is not null && c is not null) return c.IsZero ? Expr.ComplexInfinity : s / c;
                     return null;
@@ -284,6 +289,12 @@ public static class Functions
         else if (c == BigRational.Half) v = Expr.One;
         else if (c == new BigRational(1, 12)) v = (Expr.Sqrt(6) - Expr.Sqrt(2)) / 4;
         else if (c == new BigRational(5, 12)) v = (Expr.Sqrt(6) + Expr.Sqrt(2)) / 4;
+        else if (c == new BigRational(1, 8)) v = Expr.Sqrt(2 - Expr.Sqrt(2)) / 2;
+        else if (c == new BigRational(3, 8)) v = Expr.Sqrt(2 + Expr.Sqrt(2)) / 2;
+        else if (c == new BigRational(1, 10)) v = (Expr.Sqrt(5) - 1) / 4;
+        else if (c == new BigRational(3, 10)) v = (Expr.Sqrt(5) + 1) / 4;
+        else if (c == new BigRational(1, 5)) v = Expr.Sqrt(10 - 2 * Expr.Sqrt(5)) / 4;
+        else if (c == new BigRational(2, 5)) v = Expr.Sqrt(10 + 2 * Expr.Sqrt(5)) / 4;
         if (v is null) return null;
         return sign < 0 ? -v : v;
     }
@@ -303,6 +314,10 @@ public static class Functions
         (Expr.Sqrt(3) / 3, Expr.Pi / 6),
         (Expr.One, Expr.Pi / 4),
         (Expr.Sqrt(3), Expr.Pi / 3),
+        (Expr.Sqrt(2) - 1, Expr.Pi / 8),
+        (Expr.Sqrt(2) + 1, 3 * Expr.Pi / 8),
+        (2 - Expr.Sqrt(3), Expr.Pi / 12),
+        (2 + Expr.Sqrt(3), 5 * Expr.Pi / 12),
     ];
 
     private static Expr? InverseTable(Expr x, (Expr Arg, Expr Value)[] table)

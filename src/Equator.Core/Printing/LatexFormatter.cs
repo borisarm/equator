@@ -119,7 +119,7 @@ public static class LatexFormatter
                 sb.Append("\\end{pmatrix}");
                 break;
             case DEq q:
-                Write(sb, q.Lhs, 1);
+                Write(sb, q.Lhs, q.Lhs is DEq ? 0 : 1);
                 sb.Append(q.Op switch { "<=" => " \\le ", ">=" => " \\ge ", "!=" => " \\ne ", var o => " " + o + " " });
                 Write(sb, q.Rhs, 1);
                 break;

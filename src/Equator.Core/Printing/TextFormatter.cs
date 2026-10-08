@@ -89,7 +89,7 @@ public static class TextFormatter
                 sb.Append(']');
                 break;
             case DEq q:
-                Write(sb, q.Lhs, 1);
+                Write(sb, q.Lhs, q.Lhs is DEq ? 0 : 1);
                 sb.Append(' ').Append(q.Op).Append(' ');
                 Write(sb, q.Rhs, 1);
                 break;

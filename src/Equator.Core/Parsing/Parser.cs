@@ -184,7 +184,15 @@ public sealed class Parser
         {
             var op = Next().Text;
             var rhs = Sum();
-            return op == "=" ? FnExpr.Inert("@eq", lhs, rhs) : FnExpr.Inert("@rel", new StrExpr(op), lhs, rhs);
+            if (op == "=") return FnExpr.Inert("@eq", lhs, rhs);
+            var rel = FnExpr.Inert("@rel", new StrExpr(op), lhs, rhs);
+            // Chained comparisons: a < x <= b.
+            while (Peek.Kind == T.Op && Peek.Text is "<" or ">" or "<=" or ">=")
+            {
+                var op2 = Next().Text;
+                rel = FnExpr.Inert("@rel", new StrExpr(op2), rel, Sum());
+            }
+            return rel;
         }
         if (IsOp("->"))
         {
