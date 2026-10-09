@@ -8,8 +8,8 @@ public static class Series
     /// <summary>Taylor (or Laurent, for poles up to order 8) expansion of f about x = a up to (x-a)^n, plus an O() term.</summary>
     public static Expr Taylor(Expr f, Expr x, Expr a, int n, bool withOrderTerm = true)
     {
-        if (n < 0 || n > 60) throw new MathException("Series order must be between 0 and 60.");
-        if (a.IsInfinite) throw new MathException("Series about infinity is not supported; substitute x = 1/t instead.");
+        if (n < 0 || n > 60) throw new MathException(Messages.T("Series order must be between 0 and 60."));
+        if (a.IsInfinite) throw new MathException(Messages.T("Series about infinity is not supported; substitute x = 1/t instead."));
         var h = a.IsZero ? x : x - a;
 
         // Detect a pole: find the smallest m such that (x-a)^m f is finite at a.
@@ -22,7 +22,7 @@ public static class Series
             g = Rational.Cancel(Expr.Power(h, m) * f);
             v0 = ValueAt(g, x, a);
         }
-        if (v0 is null || v0.IsUndefinedOrInfinite) throw new MathException("Could not expand: the function has an essential singularity or a branch point there.");
+        if (v0 is null || v0.IsUndefinedOrInfinite) throw new MathException(Messages.T("Could not expand: the function has an essential singularity or a branch point there."));
 
         var terms = new List<Expr>();
         var d = g;
@@ -36,7 +36,7 @@ public static class Series
                 if (k % 3 == 0) d = Simplify(d);
             }
             var ck = k == 0 ? v0 : ValueAt(d, x, a);
-            if (ck is null || ck.IsUndefinedOrInfinite) throw new MathException("Could not compute the series coefficients (the function may not be analytic there).");
+            if (ck is null || ck.IsUndefinedOrInfinite) throw new MathException(Messages.T("Could not compute the series coefficients (the function may not be analytic there)."));
             ck = Solver.Tidy(ck / new Num(factorial));
             if (!ck.IsZero) terms.Add(ck * Expr.Power(h, k - m));
         }
@@ -69,7 +69,7 @@ public static class Sums
 
     private static Expr SumCore(Expr f, Expr k, Expr a, Expr b)
     {
-        if (k is not Sym) throw new MathException("Summation index must be a symbol.");
+        if (k is not Sym) throw new MathException(Messages.T("Summation index must be a symbol."));
         if (a is Num na && b is Num nb && na.Value.IsInteger && nb.Value.IsInteger)
         {
             var lo = na.Value.Num; var hi = nb.Value.Num;
@@ -236,13 +236,13 @@ public static class Sums
             for (long i = start; i < start + 2_000_000; i++)
             {
                 double t = fn(i);
-                if (!double.IsFinite(t)) throw new MathException("The series has a non-finite term.");
+                if (!double.IsFinite(t)) throw new MathException(Messages.T("The series has a non-finite term."));
                 // Kahan summation
                 var y = t - c2; var s2 = sum + y; c2 = (s2 - sum) - y; sum = s2;
                 lastTerm = t;
                 if (i - start > 100 && Math.Abs(t) < 1e-17 * Math.Max(1, Math.Abs(sum))) return new Real(sum);
             }
-            throw new MathException("The series converges too slowly to sum numerically (or diverges).");
+            throw new MathException(Messages.T("The series converges too slowly to sum numerically (or diverges)."));
         }
         return FnExpr.Inert("sum", f, k, a, Expr.Infinity);
     }

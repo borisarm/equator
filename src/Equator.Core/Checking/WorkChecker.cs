@@ -66,17 +66,17 @@ public static class WorkChecker
             var text = lines[i].Trim();
             if (text.Length == 0) continue;
             try { statements.Add((i, Parse(text))); }
-            catch (MathException ex) { steps.Add(new StepResult(i, text, Verdict.Unchecked, "Could not read this line: " + ex.Message)); }
+            catch (MathException ex) { steps.Add(new StepResult(i, text, Verdict.Unchecked, Messages.T("Could not read this line: {0}", ex.Message))); }
         }
-        if (statements.Count == 0) return Finish(steps, "Nothing to check.");
+        if (statements.Count == 0) return Finish(steps, Messages.T("Nothing to check."));
 
         var first = statements[0];
         Mode mode;
         try { mode = DecideMode(kernel, first.S); }
         catch (MathException ex)
         {
-            steps.Add(new StepResult(first.Index, first.S.Text, Verdict.Unchecked, "Could not understand the task: " + ex.Message));
-            return Finish(steps, "The first line could not be read.");
+            steps.Add(new StepResult(first.Index, first.S.Text, Verdict.Unchecked, Messages.T("Could not understand the task: {0}", ex.Message)));
+            return Finish(steps, Messages.T("The first line could not be read."));
         }
 
         return mode switch
@@ -132,7 +132,7 @@ public static class WorkChecker
         }
         var pieces = expanded.Select(SplitRelations).ToList();
         if (pieces.Any(p => p.Parts.Any(part => part.Length == 0)))
-            throw new MathException("a side of a relation is missing");
+            throw new MathException(Messages.T("a side of a relation is missing"));
         return new Statement { Text = text, Pieces = pieces, Disjunction = disjunction, Continuation = continuation };
     }
 
@@ -205,7 +205,7 @@ public static class WorkChecker
 
     private static Expr Eval(Kernel k, string text)
     {
-        if (text.Length == 0) throw new MathException("empty expression");
+        if (text.Length == 0) throw new MathException(Messages.T("empty expression"));
         return k.EvalText(text);
     }
 
@@ -237,13 +237,13 @@ public static class WorkChecker
             bool firstLine = index == statements[0].Index;
             if (s.Pieces.Count != 1 || s.Empty)
             {
-                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, "Expected an expression here."));
+                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, Messages.T("Expected an expression here.")));
                 continue;
             }
             var parts = s.Pieces[0].Parts;
             if (s.Pieces[0].Relations.Any(r => r != "="))
             {
-                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, "An inequality inside a calculation cannot be checked."));
+                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, Messages.T("An inequality inside a calculation cannot be checked.")));
                 continue;
             }
             var verdict = firstLine && parts.Count == 1 ? Verdict.Given : Verdict.Correct;
@@ -253,7 +253,7 @@ public static class WorkChecker
                 integrationVariable ??= IndefiniteIntegralVariable(part);
                 Expr value;
                 try { value = Eval(k, part); }
-                catch (MathException ex) { verdict = Worst(verdict, Verdict.Unchecked); messages.Add($"could not read '{part}': {ex.Message}"); continue; }
+                catch (MathException ex) { verdict = Worst(verdict, Verdict.Unchecked); messages.Add(Messages.T("could not read '{0}': {1}", part, ex.Message)); continue; }
                 if (current is null)
                 {
                     current = original = value;
@@ -262,26 +262,26 @@ public static class WorkChecker
                 var eq = Equivalent(current, value, integrationVariable);
                 if (eq.Equivalent)
                 {
-                    if (eq.UpToConstant) messages.Add("equal up to a constant of integration");
+                    if (eq.UpToConstant) messages.Add(Messages.T("equal up to a constant of integration"));
                 }
                 else
                 {
                     verdict = Worst(verdict, Verdict.Incorrect);
                     anyWrong = true;
-                    messages.Add($"'{part}' is not equal to the previous expression{eq.Counterexample}");
+                    messages.Add(Messages.T("'{0}' is not equal to the previous expression", part) + eq.Counterexample);
                 }
                 current = value;
             }
             if (index != statements[0].Index && NewSymbolsNote(k, s, statements[0].S) is { } note1) messages.Add(note1);
             steps.Add(new StepResult(index, s.Text, verdict, string.Join("; ", messages)));
         }
-        if (original is null || current is null) return Finish(steps, "The work could not be checked.");
+        if (original is null || current is null) return Finish(steps, Messages.T("The work could not be checked."));
         var final = Equivalent(original, current, integrationVariable);
         string summary;
-        if (final.Equivalent && !anyWrong) summary = "All steps are correct." + (final.UpToConstant ? " (The result differs from the integral only by a constant, which is fine.)" : "");
-        else if (final.Equivalent) summary = "The final result is right, but some steps are wrong (the mistakes cancel out).";
-        else summary = $"The final result is not correct: the expected value is {TextFormatter.Format(Solver.Tidy(original))}.";
-        return Finish(steps, summary);
+        if (final.Equivalent && !anyWrong) summary = Messages.T("All steps are correct.") + (final.UpToConstant ? " " + Messages.T("(The result differs from the integral only by a constant, which is fine.)") : "");
+        else if (final.Equivalent) summary = Messages.T("The final result is right, but some steps are wrong (the mistakes cancel out).");
+        else summary = Messages.T("The final result is not correct: the expected value is {0}.", TextFormatter.Format(Solver.Tidy(original)));
+        return Finish(steps, summary, finalWrong: !final.Equivalent);
     }
 
     /// <summary>The variable of an indefinite integral written in the line (integrate(f, x)), from the unevaluated parse.</summary>
@@ -321,7 +321,7 @@ public static class WorkChecker
         var extra = Symbols(k, line).Except(Symbols(k, task)).OrderBy(n => n, StringComparer.Ordinal).ToList();
         if (extra.Count == 0) return null;
         var names = string.Join(", ", extra);
-        return $"note: {names} does not appear in the task; if a symbol was misread, edit this line";
+        return Messages.T("note: {0} does not appear in the task; if a symbol was misread, edit this line", names);
     }
 
     private sealed record Equivalence(bool Equivalent, bool UpToConstant, string Counterexample);
@@ -373,11 +373,13 @@ public static class WorkChecker
             compared++;
             if (Complex.Abs(va - vb) > 1e-8 * (1 + Complex.Abs(va) + Complex.Abs(vb)))
             {
-                var at = syms.Count == 0 ? "" : " at " + string.Join(", ", syms.Select(s => $"{s} = {Fmt(vars[s].Real)}"));
-                return (false, $" ({Fmt(va)} versus {Fmt(vb)}{at})");
+                var values = string.Join(", ", syms.Select(s => $"{s} = {Fmt(vars[s].Real)}"));
+                return (false, " " + (syms.Count == 0
+                    ? Messages.T("({0} versus {1})", Fmt(va), Fmt(vb))
+                    : Messages.T("({0} versus {1} at {2})", Fmt(va), Fmt(vb), values)));
             }
         }
-        return (compared > 0, compared > 0 ? "" : " (the expressions could not be evaluated)");
+        return (compared > 0, compared > 0 ? "" : " " + Messages.T("(the expressions could not be evaluated)"));
     }
 
     private static bool Finite(Complex c) => double.IsFinite(c.Real) && double.IsFinite(c.Imaginary);
@@ -411,17 +413,17 @@ public static class WorkChecker
             try { set = Solutions(k, s, unknowns); }
             catch (MathException ex)
             {
-                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, "Could not solve this line: " + ex.Message));
+                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, Messages.T("Could not solve this line: {0}", ex.Message)));
                 continue;
             }
             if (previous is null)
             {
                 previous = original = set;
-                var given = set.Complete ? $"solutions: {Describe(set)}" : "(the solutions could only be estimated numerically)";
+                var given = set.Complete ? Messages.T("solutions: {0}", Describe(set)) : Messages.T("(the solutions could only be estimated numerically)");
                 steps.Add(new StepResult(index, s.Text, Verdict.Given, given));
                 continue;
             }
-            var (verdict, message) = Compare(previous, set, "the previous line", original);
+            var (verdict, message) = Compare(previous, set, againstTask: false, original);
             // Chained right-hand sides (2x = 7 − 3 = 4) must also agree among themselves.
             var inner = InnerChainProblem(k, s);
             if (inner is not null) { verdict = Verdict.Incorrect; message = (message.Length > 0 ? message + "; " : "") + inner; }
@@ -430,16 +432,19 @@ public static class WorkChecker
             steps.Add(new StepResult(index, s.Text, verdict, message));
             previous = set;
         }
-        if (original is null || previous is null) return Finish(steps, "The work could not be checked.");
-        var (finalVerdict, finalMessage) = Compare(original, previous, "the original task", null);
+        if (original is null || previous is null) return Finish(steps, Messages.T("The work could not be checked."));
+        var (finalVerdict, finalMessage) = Compare(original, previous, againstTask: true, null);
         string summary;
         bool solved = IsExplicitSolution(statements[^1].S, unknowns);
         if (finalVerdict == Verdict.Correct)
-            summary = (anyWrong ? "The final answer is right, but some steps are wrong." : "All steps are correct.")
-                + (!solved ? " The last line is equivalent to the task but not yet solved explicitly." : original.Points.Count == 0 ? " There is indeed no real solution." : original.Points.Count == 1 ? $" The solution {Describe(original)} is right." : $" The solutions {Describe(original)} are right.");
+            summary = (anyWrong ? Messages.T("The final answer is right, but some steps are wrong.") : Messages.T("All steps are correct.")) + " "
+                + (!solved ? Messages.T("The last line is equivalent to the task but not yet solved explicitly.")
+                    : original.Points.Count == 0 ? Messages.T("There is indeed no real solution.")
+                    : original.Points.Count == 1 ? Messages.T("The solution {0} is right.", Describe(original))
+                    : Messages.T("The solutions {0} are right.", Describe(original)));
         else
-            summary = $"The final answer is not correct: {finalMessage}. The correct solutions are {Describe(original)}.";
-        return Finish(steps, summary);
+            summary = Messages.T("The final answer is not correct: {0}. The correct solutions are {1}.", finalMessage, Describe(original));
+        return Finish(steps, summary, finalWrong: finalVerdict != Verdict.Correct);
     }
 
     private static bool IsExplicitSolution(Statement s, List<Sym> unknowns) =>
@@ -462,7 +467,7 @@ public static class WorkChecker
         var eqs = new List<Expr>();
         foreach (var p in s.Pieces)
         {
-            if (p.Parts.Count < 2 || p.Relations.Any(r => r != "=")) throw new MathException("expected an equation");
+            if (p.Parts.Count < 2 || p.Relations.Any(r => r != "=")) throw new MathException(Messages.T("expected an equation"));
             eqs.Add(Expr.Equation(Eval(k, p.Parts[0]), Eval(k, p.Parts[^1])));
         }
         return eqs;
@@ -478,7 +483,7 @@ public static class WorkChecker
                 var a = Eval(k, p.Parts[j]);
                 var b = Eval(k, p.Parts[j + 1]);
                 var eq = Equivalent(a, b, null);
-                if (!eq.Equivalent) return $"'{p.Parts[j]}' is not equal to '{p.Parts[j + 1]}'{eq.Counterexample}";
+                if (!eq.Equivalent) return Messages.T("'{0}' is not equal to '{1}'", p.Parts[j], p.Parts[j + 1]) + eq.Counterexample;
             }
         }
         return null;
@@ -540,7 +545,8 @@ public static class WorkChecker
         a.Count == b.Count && a.All(kv => b.TryGetValue(kv.Key, out var v) && Complex.Abs(v - kv.Value) < 1e-8 * (1 + Complex.Abs(v)));
 
     /// <param name="task">The original task's solutions: dropping values that never solved it (extraneous roots) is fine.</param>
-    private static (Verdict, string) Compare(SolutionSet before, SolutionSet after, string what, SolutionSet? task)
+    /// <param name="againstTask">Comparing with the original task (the final answer) rather than with the previous line.</param>
+    private static (Verdict, string) Compare(SolutionSet before, SolutionSet after, bool againstTask, SolutionSet? task)
     {
         var dropped = before.Points.Select((p, i) => (p, i)).Where(t => !after.Points.Any(q => Same(t.p, q))).ToList();
         var discarded = task is null ? [] : dropped.Where(t => !task.Points.Any(q => Same(t.p, q))).Select(t => before.Display[t.i]).ToList();
@@ -548,21 +554,35 @@ public static class WorkChecker
         var gained = after.Points.Select((p, i) => (p, i)).Where(t => !before.Points.Any(q => Same(t.p, q))).Select(t => after.Display[t.i]).ToList();
         if (lost.Count == 0 && gained.Count == 0)
         {
-            var note = discarded.Count > 0 ? $"correctly discards {string.Join("; ", discarded)}, which does not solve the original task" : "";
-            if (!(before.Complete && after.Complete)) note = note.Length > 0 ? note + " (checked numerically)" : "checked numerically";
+            var note = discarded.Count > 0 ? Messages.T("correctly discards {0}, which does not solve the original task", string.Join("; ", discarded)) : "";
+            if (!(before.Complete && after.Complete)) note = note.Length > 0 ? note + " " + Messages.T("(checked numerically)") : Messages.T("checked numerically");
             return (Verdict.Correct, note);
         }
         var parts = new List<string>();
-        if (lost.Count > 0) parts.Add($"loses the solution{(lost.Count > 1 ? "s" : "")} {string.Join("; ", lost)} of {what}");
-        if (gained.Count > 0) parts.Add($"introduces {string.Join("; ", gained)}, which {(gained.Count > 1 ? "are not solutions" : "is not a solution")} of {what}");
+        var lostText = string.Join("; ", lost);
+        var gainedText = string.Join("; ", gained);
+        if (lost.Count > 0) parts.Add((lost.Count, againstTask) switch
+        {
+            (1, false) => Messages.T("loses the solution {0} of the previous line", lostText),
+            (1, true) => Messages.T("loses the solution {0} of the original task", lostText),
+            (_, false) => Messages.T("loses the solutions {0} of the previous line", lostText),
+            (_, true) => Messages.T("loses the solutions {0} of the original task", lostText),
+        });
+        if (gained.Count > 0) parts.Add((gained.Count, againstTask) switch
+        {
+            (1, false) => Messages.T("introduces {0}, which is not a solution of the previous line", gainedText),
+            (1, true) => Messages.T("introduces {0}, which is not a solution of the original task", gainedText),
+            (_, false) => Messages.T("introduces {0}, which are not solutions of the previous line", gainedText),
+            (_, true) => Messages.T("introduces {0}, which are not solutions of the original task", gainedText),
+        });
         // Extra roots alone (e.g. after squaring) are only a warning: they can still be rejected later.
-        var verdict = lost.Count == 0 && what == "the previous line" ? Verdict.Warning : Verdict.Incorrect;
-        var message = string.Join(" and ", parts);
-        if (verdict == Verdict.Warning) message += " (an extra root, e.g. from squaring; it must be discarded at the end)";
+        var verdict = lost.Count == 0 && !againstTask ? Verdict.Warning : Verdict.Incorrect;
+        var message = string.Join(Messages.T(" and "), parts);
+        if (verdict == Verdict.Warning) message += " " + Messages.T("(an extra root, e.g. from squaring; it must be discarded at the end)");
         return (verdict, message);
     }
 
-    private static string Describe(SolutionSet s) => s.Points.Count == 0 ? "none (no real solution)" : string.Join("; ", s.Display);
+    private static string Describe(SolutionSet s) => s.Points.Count == 0 ? Messages.T("none (no real solution)") : string.Join("; ", s.Display);
 
     // ---- inequalities -------------------------------------------------------------------------------
 
@@ -571,8 +591,8 @@ public static class WorkChecker
         var symbols = statements[0].S.Pieces.SelectMany(p => p.Parts).SelectMany(t => Eval(k, t).FreeSymbols()).Distinct().ToList();
         if (symbols.Count != 1)
         {
-            steps.Add(new StepResult(statements[0].Index, statements[0].S.Text, Verdict.Unchecked, "Only inequalities in one variable can be checked."));
-            return Finish(steps, "The work could not be checked.");
+            steps.Add(new StepResult(statements[0].Index, statements[0].S.Text, Verdict.Unchecked, Messages.T("Only inequalities in one variable can be checked.")));
+            return Finish(steps, Messages.T("The work could not be checked."));
         }
         var x = symbols[0];
         Func<double, bool>? previous = null, original = null;
@@ -583,7 +603,7 @@ public static class WorkChecker
             try { member = Membership(k, s, x); }
             catch (MathException ex)
             {
-                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, "Could not read this line: " + ex.Message));
+                steps.Add(new StepResult(index, s.Text, Verdict.Unchecked, Messages.T("Could not read this line: {0}", ex.Message)));
                 continue;
             }
             if (previous is null)
@@ -598,15 +618,18 @@ public static class WorkChecker
             {
                 anyWrong = true;
                 steps.Add(new StepResult(index, s.Text, Verdict.Incorrect,
-                    $"{x.Name} = {Fmt(diff.Value)} {(previous(diff.Value) ? "satisfies the previous line but not this one" : "satisfies this line but not the previous one")}"));
+                    previous(diff.Value)
+                        ? Messages.T("{0} satisfies the previous line but not this one", $"{x.Name} = {Fmt(diff.Value)}")
+                        : Messages.T("{0} satisfies this line but not the previous one", $"{x.Name} = {Fmt(diff.Value)}")));
             }
             previous = member;
         }
-        if (original is null || previous is null) return Finish(steps, "The work could not be checked.");
+        if (original is null || previous is null) return Finish(steps, Messages.T("The work could not be checked."));
         var final = FindDifference(original, previous);
         return Finish(steps, final is null
-            ? anyWrong ? "The final answer is right, but some steps are wrong." : "All steps are correct."
-            : $"The final answer is not correct: at {x.Name} = {Fmt(final.Value)} it disagrees with the original inequality.");
+            ? anyWrong ? Messages.T("The final answer is right, but some steps are wrong.") : Messages.T("All steps are correct.")
+            : Messages.T("The final answer is not correct: at {0} it disagrees with the original inequality.", $"{x.Name} = {Fmt(final.Value)}"),
+            finalWrong: final is not null);
     }
 
     private static Func<double, bool> Membership(Kernel k, Statement s, Sym x)
@@ -646,10 +669,10 @@ public static class WorkChecker
         return null;
     }
 
-    private static WorkReport Finish(List<StepResult> steps, string summary)
+    private static WorkReport Finish(List<StepResult> steps, string summary, bool finalWrong = false)
     {
         steps.Sort((a, b) => a.Index.CompareTo(b.Index));
-        var overall = steps.Any(s => s.Verdict == Verdict.Incorrect) || summary.StartsWith("The final answer is not") || summary.StartsWith("The final result is not")
+        var overall = steps.Any(s => s.Verdict == Verdict.Incorrect) || finalWrong
             ? Verdict.Incorrect
             : steps.Any(s => s.Verdict == Verdict.Warning) ? Verdict.Warning
             : steps.All(s => s.Verdict is Verdict.Unchecked) ? Verdict.Unchecked

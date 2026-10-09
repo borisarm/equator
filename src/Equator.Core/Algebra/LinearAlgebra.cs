@@ -8,7 +8,7 @@ public static class LinearAlgebra
 
     public static Expr[,] ToArray(Expr e)
     {
-        if (!IsMatrix(e)) throw new MathException("Expected a matrix, e.g. [[1, 2], [3, 4]].");
+        if (!IsMatrix(e)) throw new MathException(Messages.T("Expected a matrix, e.g. [[1, 2], [3, 4]]."));
         var rows = ((ListExpr)e).Items.Cast<ListExpr>().ToList();
         var m = new Expr[rows.Count, rows[0].Items.Count];
         for (int i = 0; i < rows.Count; i++)
@@ -57,24 +57,24 @@ public static class LinearAlgebra
         if (IsVector(a) && IsVector(b))
         {
             var x = ((ListExpr)a).Items; var y = ((ListExpr)b).Items;
-            if (x.Count != y.Count) throw new MathException($"Dot product needs vectors of equal length ({x.Count} vs {y.Count}).");
+            if (x.Count != y.Count) throw new MathException(Messages.T("Dot product needs vectors of equal length ({0} vs {1}).", x.Count, y.Count));
             return Expr.Plus(x.Zip(y, (p, q) => p * q));
         }
         if (IsMatrix(a) && IsVector(b))
         {
             var m = ToArray(a); var v = ((ListExpr)b).Items;
-            if (m.GetLength(1) != v.Count) throw new MathException($"Incompatible shapes: {m.GetLength(0)}×{m.GetLength(1)} matrix times vector of length {v.Count}.");
+            if (m.GetLength(1) != v.Count) throw new MathException(Messages.T("Incompatible shapes: {0}×{1} matrix times vector of length {2}.", m.GetLength(0), m.GetLength(1), v.Count));
             return Expr.List(Enumerable.Range(0, m.GetLength(0)).Select(i => Expr.Plus(Enumerable.Range(0, v.Count).Select(k => m[i, k] * v[k]))));
         }
         if (IsVector(a) && IsMatrix(b))
         {
             var v = ((ListExpr)a).Items; var m = ToArray(b);
-            if (m.GetLength(0) != v.Count) throw new MathException("Incompatible shapes for vector times matrix.");
+            if (m.GetLength(0) != v.Count) throw new MathException(Messages.T("Incompatible shapes for vector times matrix."));
             return Expr.List(Enumerable.Range(0, m.GetLength(1)).Select(j => Expr.Plus(Enumerable.Range(0, v.Count).Select(k => v[k] * m[k, j]))));
         }
         var A = ToArray(a); var B = ToArray(b);
         if (A.GetLength(1) != B.GetLength(0))
-            throw new MathException($"Incompatible shapes: {A.GetLength(0)}×{A.GetLength(1)} times {B.GetLength(0)}×{B.GetLength(1)}.");
+            throw new MathException(Messages.T("Incompatible shapes: {0}×{1} times {2}×{3}.", A.GetLength(0), A.GetLength(1), B.GetLength(0), B.GetLength(1)));
         var C = new Expr[A.GetLength(0), B.GetLength(1)];
         for (int i = 0; i < A.GetLength(0); i++)
             for (int j = 0; j < B.GetLength(1); j++)
@@ -85,7 +85,7 @@ public static class LinearAlgebra
     public static Expr MatrixPower(Expr a, int n)
     {
         var m = ToArray(a);
-        if (m.GetLength(0) != m.GetLength(1)) throw new MathException("Matrix power requires a square matrix.");
+        if (m.GetLength(0) != m.GetLength(1)) throw new MathException(Messages.T("Matrix power requires a square matrix."));
         if (n < 0) return MatrixPower(Inverse(a), -n);
         Expr result = Identity(m.GetLength(0));
         Expr square = a;
@@ -105,7 +105,7 @@ public static class LinearAlgebra
     {
         var m = ToArray(e);
         int n = m.GetLength(0);
-        if (n != m.GetLength(1)) throw new MathException("Determinant requires a square matrix.");
+        if (n != m.GetLength(1)) throw new MathException(Messages.T("Determinant requires a square matrix."));
         bool numeric = m.Cast<Expr>().All(x => x.IsNumber);
         if (!numeric && n <= 4) return Simp(Expansion.Expand(Cofactor(m)));
         return Simp(Bareiss(m));
@@ -196,7 +196,7 @@ public static class LinearAlgebra
     {
         var m = ToArray(e);
         int n = m.GetLength(0);
-        if (n != m.GetLength(1)) throw new MathException("Only square matrices can be inverted.");
+        if (n != m.GetLength(1)) throw new MathException(Messages.T("Only square matrices can be inverted."));
         if (n <= 4 && !m.Cast<Expr>().All(x => x.IsNumber)) return AdjugateInverse(m);
         var aug = new Expr[n, 2 * n];
         for (int i = 0; i < n; i++)
@@ -206,7 +206,7 @@ public static class LinearAlgebra
                 aug[i, n + j] = i == j ? Expr.One : Expr.Zero;
             }
         var (r, pivots) = Rref(aug);
-        if (pivots.Count < n || pivots[n - 1] >= n) throw new MathException("The matrix is singular (not invertible).");
+        if (pivots.Count < n || pivots[n - 1] >= n) throw new MathException(Messages.T("The matrix is singular (not invertible)."));
         var inv = new Expr[n, n];
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
@@ -218,7 +218,7 @@ public static class LinearAlgebra
     {
         int n = m.GetLength(0);
         var det = Simp(Expansion.Expand(Cofactor(m)));
-        if (det.IsZero) throw new MathException("The matrix is singular (not invertible).");
+        if (det.IsZero) throw new MathException(Messages.T("The matrix is singular (not invertible)."));
         var inv = new Expr[n, n];
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
@@ -271,7 +271,7 @@ public static class LinearAlgebra
     {
         var m = ToArray(a);
         int n = m.GetLength(0);
-        if (n != m.GetLength(1)) throw new MathException("Characteristic polynomial requires a square matrix.");
+        if (n != m.GetLength(1)) throw new MathException(Messages.T("Characteristic polynomial requires a square matrix."));
         var shifted = new Expr[n, n];
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
@@ -286,7 +286,7 @@ public static class LinearAlgebra
         var lambda = new Sym("\u0001lambda");
         var cp = CharacteristicPolynomial(a, lambda);
         var roots = Solver.PolynomialRoots(cp, lambda, withMultiplicity: true);
-        if (roots is null) throw new MathException("Could not compute the eigenvalues.");
+        if (roots is null) throw new MathException(Messages.T("Could not compute the eigenvalues."));
         return roots;
     }
 
@@ -328,7 +328,7 @@ public static class LinearAlgebra
         var m = ToArray(a);
         int rows = m.GetLength(0), cols = m.GetLength(1);
         var rhs = ((ListExpr)b).Items;
-        if (rhs.Count != rows) throw new MathException("Right-hand side length does not match the number of rows.");
+        if (rhs.Count != rows) throw new MathException(Messages.T("Right-hand side length does not match the number of rows."));
         var aug = new Expr[rows, cols + 1];
         for (int i = 0; i < rows; i++)
         {
@@ -336,7 +336,7 @@ public static class LinearAlgebra
             aug[i, cols] = rhs[i];
         }
         var (r, pivots) = Rref(aug);
-        if (pivots.Contains(cols)) throw new MathException("The linear system is inconsistent (no solution).");
+        if (pivots.Contains(cols)) throw new MathException(Messages.T("The linear system is inconsistent (no solution)."));
         var x = new Expr[cols];
         for (int j = 0; j < cols; j++) x[j] = Expr.Zero;
         for (int i = 0; i < pivots.Count; i++) x[pivots[i]] = r[i, cols];
@@ -370,7 +370,7 @@ public static class LinearAlgebra
     public static Expr Cross(Expr a, Expr b)
     {
         if (a is not ListExpr { Items.Count: 3 } u || b is not ListExpr { Items.Count: 3 } v)
-            throw new MathException("cross() needs two 3-vectors.");
+            throw new MathException(Messages.T("cross() needs two 3-vectors."));
         var x = u.Items; var y = v.Items;
         return Expr.List(x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]);
     }

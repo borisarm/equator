@@ -40,7 +40,7 @@ public sealed class Parser
     public static Expr ParseExpr(string src)
     {
         var stmts = ParseProgram(src);
-        if (stmts.Count != 1) throw new ParseException("Expected a single expression.", 0);
+        if (stmts.Count != 1) throw new ParseException(Messages.T("Expected a single expression."), 0);
         return stmts[0].Tree;
     }
 
@@ -99,7 +99,7 @@ public sealed class Parser
                 i++;
                 var sb = new StringBuilder();
                 while (i < s.Length && s[i] != '"') sb.Append(s[i++]);
-                if (i >= s.Length) throw new ParseException("Unterminated string.", start);
+                if (i >= s.Length) throw new ParseException(Messages.T("Unterminated string."), start);
                 i++;
                 list.Add(new Token(T.String, sb.ToString(), start, space));
             }
@@ -140,7 +140,7 @@ public sealed class Parser
 
     private void Expect(string op)
     {
-        if (!IsOp(op)) throw Error($"Expected '{op}'" + (Peek.Kind == T.End ? " before end of input." : $" but found '{Peek.Text}'."));
+        if (!IsOp(op)) throw Error(Peek.Kind == T.End ? Messages.T("Expected '{0}' before end of input.", op) : Messages.T("Expected '{0}' but found '{1}'.", op, Peek.Text));
         _p++;
     }
 
@@ -158,7 +158,7 @@ public sealed class Parser
             bool suppressed = false;
             if (IsOp(";")) { suppressed = true; _p++; }
             else if (Peek.Kind == T.NewLine) _p++;
-            else if (Peek.Kind != T.End) throw Error($"Unexpected '{Peek.Text}'.");
+            else if (Peek.Kind != T.End) throw Error(Messages.T("Unexpected '{0}'.", Peek.Text));
             int end = _p > 0 ? _tokens[_p - 1].Pos + _tokens[_p - 1].Text.Length : start;
             result.Add(new Statement(stmt, suppressed, _src[start..Math.Min(end, _src.Length)].Trim()));
         }
@@ -362,8 +362,8 @@ public sealed class Parser
                 }
                 break;
         }
-        if (t.Kind == T.End) throw Error("Unexpected end of input.");
-        throw Error($"Unexpected '{t.Text}'.");
+        if (t.Kind == T.End) throw Error(Messages.T("Unexpected end of input."));
+        throw Error(Messages.T("Unexpected '{0}'.", t.Text));
     }
 
     private static Expr Identifier(string name) => name switch

@@ -58,7 +58,7 @@ public readonly struct BigFloat : IEquatable<BigFloat>, IComparable<BigFloat>
 
     public static BigFloat FromDouble(double d, int precision)
     {
-        if (double.IsNaN(d) || double.IsInfinity(d)) throw new MathException("Cannot convert a non-finite number to arbitrary precision.");
+        if (double.IsNaN(d) || double.IsInfinity(d)) throw new MathException(Messages.T("Cannot convert a non-finite number to arbitrary precision."));
         if (d == 0) return Zero(precision);
         long bits = BitConverter.DoubleToInt64Bits(d);
         bool negative = bits < 0;
@@ -116,7 +116,7 @@ public readonly struct BigFloat : IEquatable<BigFloat>, IComparable<BigFloat>
 
     public static BigFloat Sqrt(BigFloat a, int precision)
     {
-        if (a.Sign < 0) throw new MathException("Square root of a negative number.");
+        if (a.Sign < 0) throw new MathException(Messages.T("Square root of a negative number."));
         if (a.IsZero) return Zero(precision);
         // Scale so the exponent is even and the mantissa has about 2·precision bits.
         long shift = 2L * (precision + 8) - (long)a.Mantissa.GetBitLength();

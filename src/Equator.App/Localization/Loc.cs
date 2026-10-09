@@ -6,8 +6,10 @@ namespace Equator.App.Localization;
 
 /// <summary>
 /// Interface strings. Each language is a flat JSON table (Strings/&lt;code&gt;.json, embedded in the assembly);
-/// a key missing from a translation falls back to English, then to the key itself. Command names, maths and
-/// notebook contents are never translated: worksheets have to run the same in every language.
+/// a key missing from a translation falls back to English, then to the key itself. Engine messages have their
+/// own tables (Strings/Engine/&lt;code&gt;.json) keyed by the English text, installed through Core's Messages hook.
+/// Command names, maths and notebook contents are never translated: worksheets have to run the same in every
+/// language.
 /// </summary>
 public static class Loc
 {
@@ -24,8 +26,10 @@ public static class Loc
         ("pt-BR", "Português (Brasil)"),
     ];
 
-    private static readonly Dictionary<string, string> English = Load("en");
+    private static readonly Dictionary<string, string> English = Load("Strings", "en");
     private static Dictionary<string, string> _table = English;
+    // Engine messages for the current language, keyed by the English template (empty for English).
+    private static Dictionary<string, string> _engine = [];
 
     /// <summary>The language in use.</summary>
     public static string Current { get; private set; } = "en";
@@ -42,6 +46,9 @@ public static class Loc
     public static void Initialize()
     {
         Preference = Settings.Language;
+        // The engine runs on its own thread; both lookups only read the tables, which are replaced, never changed.
+        Equator.Core.Messages.Translate = template => _engine.TryGetValue(template, out var t) ? t : null;
+        Equator.Core.Messages.TranslateDescription = name => _table.TryGetValue("fn." + name, out var d) ? d : null;
         var forced = Environment.GetEnvironmentVariable("EQUATOR_LANG");
         Apply(Resolve(forced is { Length: > 0 } ? forced : Preference));
     }
@@ -84,12 +91,13 @@ public static class Loc
     private static void Apply(string code)
     {
         Current = code;
-        _table = code == "en" ? English : Load(code);
+        _table = code == "en" ? English : Load("Strings", code);
+        _engine = code == "en" ? [] : Load("Engine", code);
     }
 
-    private static Dictionary<string, string> Load(string code)
+    private static Dictionary<string, string> Load(string kind, string code)
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"Strings.{code}.json");
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{kind}.{code}.json");
         if (stream is null) return new Dictionary<string, string>();
         return JsonSerializer.Deserialize<Dictionary<string, string>>(stream) ?? new Dictionary<string, string>();
     }

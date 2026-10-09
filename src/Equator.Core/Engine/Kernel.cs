@@ -128,7 +128,7 @@ public sealed class Kernel
     public Expr Eval(Expr e)
     {
         Interrupt.Check();
-        if (++_depth > 2500) throw new MathException("Recursion limit exceeded.");
+        if (++_depth > 2500) throw new MathException(Messages.T("Recursion limit exceeded."));
         try
         {
             return EvalCore(e);
@@ -205,7 +205,7 @@ public sealed class Kernel
                 // A bare y' (as used in differential equations) stays an inert derivative marker.
                 return FnExpr.Inert("@d", Eval(a[0]), a[1]);
         }
-        throw new MathException($"Unknown operator {f.Name}.");
+        throw new MathException(Messages.T("Unknown operator {0}.", f.Name));
     }
 
     /// <summary>MATLAB-style product: matrix·matrix and matrix·vector multiply; everything else is elementwise.</summary>
@@ -264,11 +264,11 @@ public sealed class Kernel
     {
         foreach (var i in idx)
         {
-            if (target is not ListExpr l) throw new MathException("Only lists and matrices can be indexed.");
-            if (i is not Num { Value.IsInteger: true } n) throw new MathException("Indices must be integers.");
+            if (target is not ListExpr l) throw new MathException(Messages.T("Only lists and matrices can be indexed."));
+            if (i is not Num { Value.IsInteger: true } n) throw new MathException(Messages.T("Indices must be integers."));
             var k = (int)n.Value.Num;
             if (k < 0) k = l.Items.Count + 1 + k;
-            if (k < 1 || k > l.Items.Count) throw new MathException($"Index {n} is out of range 1..{l.Items.Count}.");
+            if (k < 1 || k > l.Items.Count) throw new MathException(Messages.T("Index {0} is out of range 1..{1}.", n, l.Items.Count));
             target = l.Items[k - 1];
         }
         return target;
@@ -280,18 +280,18 @@ public sealed class Kernel
         if (n < 0)
         {
             int k = _history.Count + n;
-            if (k < 0) throw new MathException("There is no previous output.");
+            if (k < 0) throw new MathException(Messages.T("There is no previous result."));
             return _history[k];
         }
         if (_out.TryGetValue(n, out var v)) return v;
-        throw new MathException($"Out[{n}] does not exist.");
+        throw new MathException(Messages.T("There is no result %{0}.", n));
     }
 
     private Expr Assign(Expr lhs, Expr rhs)
     {
         if (lhs is Sym s)
         {
-            if (s.IsSpecial || Builtins.IsBuiltin(s.Name)) throw new MathException($"'{s.Name}' is protected and cannot be assigned.");
+            if (s.IsSpecial || Builtins.IsBuiltin(s.Name)) throw new MathException(Messages.T("'{0}' is protected and cannot be assigned.", s.Name));
             var value = Eval(rhs);
             _vars[s.Name] = value;
             _funcs.Remove(s.Name);
@@ -300,9 +300,9 @@ public sealed class Kernel
         if (lhs is FnExpr { Name: "@call" } call && call.Args[0] is Sym fname)
         {
             if (Builtins.IsBuiltin(fname.Name) || Functions.Numeric.Contains(fname.Name))
-                throw new MathException($"'{fname.Name}' is a built-in function and cannot be redefined.");
+                throw new MathException(Messages.T("'{0}' is a built-in function and cannot be redefined.", fname.Name));
             var pars = call.Args.Skip(1).ToList();
-            if (pars.Any(p => p is not Sym)) throw new MathException("Function parameters must be plain names, e.g. f(x, y) := x^2 + y.");
+            if (pars.Any(p => p is not Sym)) throw new MathException(Messages.T("Function parameters must be plain names, e.g. f(x, y) := x^2 + y."));
             var names = pars.Cast<Sym>().Select(p => p.Name).ToList();
             _funcs[fname.Name] = new UserFunction(fname.Name, names, rhs);
             _vars.Remove(fname.Name);
@@ -314,10 +314,10 @@ public sealed class Kernel
             }
             catch (MathException)
             {
-                return new StrExpr($"Defined {fname.Name}({string.Join(", ", names)}).");
+                return new StrExpr(Messages.T("Defined {0}.", $"{fname.Name}({string.Join(", ", names)})"));
             }
         }
-        throw new MathException("Can only assign to a name (x := 2) or define a function (f(x) := x^2).");
+        throw new MathException(Messages.T("Can only assign to a name (x := 2) or define a function (f(x) := x^2)."));
     }
 
     public T WithShadowed<T>(IEnumerable<string> names, Func<T> body)
@@ -331,7 +331,7 @@ public sealed class Kernel
     {
         if (head is FnExpr { Name: "@prime" } prime)
             return CallDerivative(prime, rawArgs);
-        if (head is not Sym s) throw new MathException("Invalid function call.");
+        if (head is not Sym s) throw new MathException(Messages.T("Invalid function call."));
         var name = Builtins.Canonical(s.Name);
 
         if (_funcs.TryGetValue(s.Name, out var uf))
@@ -343,7 +343,7 @@ public sealed class Kernel
         if (Builtins.TryGet(name, out var builtin))
         {
             if (rawArgs.Count < builtin.MinArgs || rawArgs.Count > builtin.MaxArgs)
-                throw new MathException($"{builtin.Name} expects {ArgCount(builtin)}. Usage: {builtin.Usage}");
+                throw new MathException(Messages.T("{0} expects {1}. Usage: {2}", builtin.Name, ArgCount(builtin), builtin.Usage));
             if (builtin.Lazy is not null) return builtin.Lazy(this, rawArgs);
             var bound = builtin.BoundArgs.Where(i => i < rawArgs.Count).SelectMany(i => BoundNames(rawArgs[i])).ToList();
             var args = WithShadowed(bound, () => rawArgs.Select(Eval).ToArray());
@@ -351,14 +351,14 @@ public sealed class Kernel
         }
 
         if (_vars.TryGetValue(s.Name, out var val) && rawArgs.Count == 1 && val is not ListExpr)
-            throw new MathException($"'{s.Name}' is a variable, not a function. Use {s.Name}*(...) for multiplication.");
+            throw new MathException(Messages.T("'{0}' is a variable, not a function. Use {0}*(...) for multiplication.", s.Name));
 
         return Expr.Call(name, rawArgs.Select(Eval).ToArray());
     }
 
     private static string ArgCount(Builtin b) =>
-        b.MinArgs == b.MaxArgs ? $"{b.MinArgs} argument{(b.MinArgs == 1 ? "" : "s")}"
-        : b.MaxArgs == int.MaxValue ? $"at least {b.MinArgs} arguments" : $"{b.MinArgs} to {b.MaxArgs} arguments";
+        b.MinArgs == b.MaxArgs ? (b.MinArgs == 1 ? Messages.T("1 argument") : Messages.T("{0} arguments", b.MinArgs))
+        : b.MaxArgs == int.MaxValue ? Messages.T("at least {0} arguments", b.MinArgs) : Messages.T("{0} to {1} arguments", b.MinArgs, b.MaxArgs);
 
     private static IEnumerable<string> BoundNames(Expr raw) => raw switch
     {
@@ -385,7 +385,7 @@ public sealed class Kernel
     private Expr CallUser(UserFunction uf, List<Expr> args)
     {
         if (args.Count != uf.Parameters.Count)
-            throw new MathException($"{uf.Name} expects {uf.Parameters.Count} argument(s), got {args.Count}.");
+            throw new MathException(Messages.T("{0} expects {1} argument(s), got {2}.", uf.Name, uf.Parameters.Count, args.Count));
         // Bind parameters in a fresh frame.
         var saved = new Dictionary<string, Expr?>();
         var wasShadowed = new List<string>();
@@ -428,7 +428,7 @@ public sealed class Kernel
                 ? FnExpr.Inert("diff", FnExpr.Inert(unknown.Name, arg), arg)
                 : FnExpr.Inert("diff", FnExpr.Inert(unknown.Name, arg), arg, order);
         }
-        throw new MathException("f' notation needs a one-argument function, e.g. f(x) := x^3 then f'(2).");
+        throw new MathException(Messages.T("f' notation needs a one-argument function, e.g. f(x) := x^3 then f'(2)."));
     }
 
     /// <summary>Evaluates text and returns the value of the last statement (for tests and tools).</summary>

@@ -47,7 +47,7 @@ public static class ZetaFunction
         int wp = precision + 48;
         var one = BigFloat.FromInteger(1, wp);
         var sr = s.WithPrecision(wp);
-        if (sr.CompareTo(one) == 0) throw new MathException("zeta has a pole at 1.");
+        if (sr.CompareTo(one) == 0) throw new MathException(Messages.T("zeta has a pole at 1."));
         var half = BigFloat.FromRational(BigRational.Half, wp);
         if (sr.CompareTo(half) < 0)
         {

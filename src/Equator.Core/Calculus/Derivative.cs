@@ -10,7 +10,7 @@ public static class Derivative
 
     public static Expr Diff(Expr e, Expr x)
     {
-        if (x is not Sym) throw new MathException("Can only differentiate with respect to a symbol.");
+        if (x is not Sym) throw new MathException(Messages.T("Can only differentiate with respect to a symbol."));
         if (e.FreeOf(x)) return e is ListExpr l ? Expr.List(l.Items.Select(_ => (Expr)Expr.Zero)) : Expr.Zero;
         switch (e)
         {
@@ -45,7 +45,7 @@ public static class Derivative
             case EqExpr q:
                 return Expr.Equation(Diff(q.Lhs, x), Diff(q.Rhs, x));
         }
-        throw new MathException($"Cannot differentiate {e}.");
+        throw new MathException(Messages.T("Cannot differentiate {0}.", e));
     }
 
     private static Expr DiffFunction(FnExpr f, Expr x)

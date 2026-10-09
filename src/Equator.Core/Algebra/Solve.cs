@@ -259,7 +259,7 @@ public static class Solver
         var f = equation is EqExpr eq ? eq.Lhs - eq.Rhs : equation;
         if (f.FreeOf(x))
         {
-            if (Simplifier.Simplify(f).IsZero) throw new MathException($"The equation holds for every value of {x}.");
+            if (Simplifier.Simplify(f).IsZero) throw new MathException(Messages.T("The equation holds for every value of {0}.", x));
             return [];
         }
 
@@ -659,7 +659,7 @@ public static class Solver
     public static List<Expr> NumericSolve(Expr f, Expr x, double a = -100, double b = 100)
     {
         if (!f.FreeSymbols().All(s => s == x))
-            throw new MathException("Cannot solve this equation symbolically, and it contains other symbols so it cannot be solved numerically.");
+            throw new MathException(Messages.T("Cannot solve this equation symbolically, and it contains other symbols so it cannot be solved numerically."));
         var fn = NumericEval.Compile1(f, ((Sym)x).Name);
         var roots = NumericMethods.RealRoots(fn, a, b, 20000);
         return roots.Select(r => (Expr)new Real(r)).ToList();
@@ -678,19 +678,19 @@ public static class Solver
         if (variables is null)
         {
             vars = eqs.SelectMany(e => e.FreeSymbols()).Distinct().Cast<Expr>().ToList();
-            if (vars.Count == 0) throw new MathException("No variable to solve for.");
+            if (vars.Count == 0) throw new MathException(Messages.T("No variable to solve for."));
             if (eqs.Count == 1 && vars.Count > 1)
-                throw new MathException($"Specify the variable to solve for, e.g. solve(eq, {vars[0]}).");
+                throw new MathException(Messages.T("Specify the variable to solve for, e.g. solve(eq, {0}).", vars[0]));
         }
         else vars = variables is ListExpr vl ? vl.Items.ToList() : [variables];
 
-        if (vars.Any(v => v is not Sym)) throw new MathException("Solve variables must be symbols.");
+        if (vars.Any(v => v is not Sym)) throw new MathException(Messages.T("Solve variables must be symbols."));
 
         if (eqs.Any(e => e is FnExpr { Name: "@rel" }))
         {
-            if (vars.Count != 1) throw new MathException("solve: inequalities can only be solved for one variable.");
+            if (vars.Count != 1) throw new MathException(Messages.T("solve: inequalities can only be solved for one variable."));
             if (eqs.Any(e => e is not FnExpr { Name: "@rel" }))
-                throw new MathException("solve: cannot mix equations and inequalities.");
+                throw new MathException(Messages.T("solve: cannot mix equations and inequalities."));
             return Inequalities.Solve(eqs.SelectMany(Inequalities.Conditions).ToList(), (Sym)vars[0]);
         }
 
@@ -845,7 +845,7 @@ public static class Solver
     private static List<Dictionary<Expr, Expr>> NumericSystem(List<Expr> eqs, List<Expr> vars)
     {
         if (eqs.Count != vars.Count || eqs.Any(e => e.FreeSymbols().Any(s => !vars.Contains(s))))
-            throw new MathException("Could not solve this system.");
+            throw new MathException(Messages.T("Could not solve this system."));
         var names = vars.Select(v => ((Sym)v).Name).ToArray();
         var fs = eqs.Select(e => NumericEval.Compile(e, names)).ToArray();
         var found = new List<double[]>();
@@ -858,7 +858,7 @@ public static class Solver
             if (found.Any(f => f.Zip(sol).All(p => Math.Abs(p.First - p.Second) < 1e-7 * Math.Max(1, Math.Abs(p.First))))) continue;
             found.Add(sol);
         }
-        if (found.Count == 0) throw new MathException("Could not solve this system.");
+        if (found.Count == 0) throw new MathException(Messages.T("Could not solve this system."));
         return found.Select(s => vars.Select((v, i) => (v, (Expr)new Real(Math.Abs(s[i]) < 1e-13 ? 0 : s[i]))).ToDictionary(p => p.v, p => p.Item2)).ToList();
     }
 }

@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window
         if (Environment.GetEnvironmentVariable("EQUATOR_SNAPSHOT") is { Length: > 0 } snapPath)
         {
             _snapshotTimer = DispatcherQueue.CreateTimer();
-            _snapshotTimer.Interval = TimeSpan.FromSeconds(7);
+            _snapshotTimer.Interval = TimeSpan.FromSeconds(double.TryParse(Environment.GetEnvironmentVariable("EQUATOR_SNAPSHOT_DELAY"), out var delay) ? delay : 7);
             _snapshotTimer.IsRepeating = false;
             _snapshotTimer.Tick += async (_, _) => await SnapshotAsync(snapPath);
             _snapshotTimer.Start();
@@ -90,7 +90,7 @@ public sealed partial class MainWindow : Window
     private double MathSize => BaseMathSize * _zoom;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _snapshotTimer;
 
-    /// <summary>Diagnostics: renders the window content to a PNG (set EQUATOR_SNAPSHOT=path).</summary>
+    /// <summary>Diagnostics: renders the window content to a PNG (set EQUATOR_SNAPSHOT=path; EQUATOR_SNAPSHOT_DELAY=seconds).</summary>
     private async Task SnapshotAsync(string basePath)
     {
         int count = int.TryParse(Environment.GetEnvironmentVariable("EQUATOR_SNAPSHOT_PAGES"), out var n) ? n : 1;
@@ -623,6 +623,9 @@ public sealed partial class MainWindow : Window
     {
         RootGrid.FlowDirection = Loc.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
         RootGrid.Language = Loc.Current;
+        // Cells hold maths: numbers there must look the way they are typed (7, not ٧), whatever the language.
+        // Chinese keeps its own tag so Han characters in comments use Simplified Chinese glyphs.
+        CellsPanel.Language = Loc.Current == "zh-Hans" ? "zh-Hans" : "en-US";
         BuildFunctionList(FunctionSearch.Text.Trim());
         BuildGuide();
         RefreshVariables(_variables);
@@ -663,15 +666,24 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowShortcutsAsync()
     {
+        // Key names as printed on keyboards in the interface language (Maj+Entrée, Mayús+Intro, ...).
+        static string K(string keys) => string.Join("+", keys.Split('+').Select(k => k switch
+        {
+            "Shift" => Loc.Get("key.shift"),
+            "Enter" => Loc.Get("key.enter"),
+            "Backspace" => Loc.Get("key.backspace"),
+            "Esc" => Loc.Get("key.esc"),
+            _ => k,
+        }));
         var text = string.Join("\n", new[]
         {
-            "Shift+Enter\t" + Loc.Get("keys.run"),
-            "Ctrl+Enter\t" + Loc.Get("keys.runStay"),
-            "Alt+Enter\t" + Loc.Get("keys.runAdd"),
+            K("Shift+Enter") + "\t" + Loc.Get("keys.run"),
+            K("Ctrl+Enter") + "\t" + Loc.Get("keys.runStay"),
+            K("Alt+Enter") + "\t" + Loc.Get("keys.runAdd"),
             "↑ / ↓\t" + Loc.Get("keys.move"),
-            "Ctrl+Shift+Backspace\t" + Loc.Get("keys.delete"),
+            K("Ctrl+Shift+Backspace") + "\t" + Loc.Get("keys.delete"),
             "F5\t" + Loc.Get("keys.runAll"),
-            "Ctrl+Esc\t" + Loc.Get("keys.stop"),
+            K("Ctrl+Esc") + "\t" + Loc.Get("keys.stop"),
             "Ctrl+N / Ctrl+O / Ctrl+S\t" + Loc.Get("keys.files"),
             "Ctrl+Plus / Ctrl+Minus\t" + Loc.Get("keys.zoom"),
             "",

@@ -33,7 +33,7 @@ public sealed class AssumptionSet
     {
         var d = new Dictionary<string, SymbolFacts>(_facts);
         var merged = d.TryGetValue(name, out var old) ? old.Intersect(facts) : facts;
-        if (merged.IsEmpty) throw new MathException($"assume: the assumptions about {name} contradict each other.");
+        if (merged.IsEmpty) throw new MathException(Messages.T("assume: the assumptions about {0} contradict each other.", name));
         d[name] = merged;
         return new(d);
     }
@@ -59,12 +59,12 @@ public sealed class AssumptionSet
                     var (l, r) = (rel.Args[1], rel.Args[2]);
                     if (l is Sym ls && !ls.IsSpecial && Constant(r) is { } rv) return With(ls.Name, FromRelation(op, rv));
                     if (r is Sym rs && !rs.IsSpecial && Constant(l) is { } lv) return With(rs.Name, FromRelation(Flip(op), lv));
-                    throw new MathException("assume: a condition must compare a variable with a number, e.g. x > 0.");
+                    throw new MathException(Messages.T("assume: a condition must compare a variable with a number, e.g. x > 0."));
                 }
             case Sym { Name: "True" }:
                 return this;
         }
-        throw new MathException("assume: expected a condition such as x > 0, or a property such as assume(x, real).");
+        throw new MathException(Messages.T("assume: expected a condition such as x > 0, or a property such as assume(x, real)."));
     }
 
     public AssumptionSet AddProperty(Sym x, string property)
@@ -80,7 +80,7 @@ public sealed class AssumptionSet
             "nonzero" => SymbolFacts.None with { NonZero = true },
             "natural" => SymbolFacts.None with { Real = true, Integer = true, Lo = 0, LoStrict = false },
             "complex" => SymbolFacts.None,
-            _ => throw new MathException($"assume: unknown property '{property}'. Use real, integer, positive, negative, nonnegative, nonpositive, nonzero or natural."),
+            _ => throw new MathException(Messages.T("assume: unknown property '{0}'. Use real, integer, positive, negative, nonnegative, nonpositive, nonzero or natural.", property)),
         };
         return With(x.Name, f);
     }
@@ -104,7 +104,7 @@ public sealed class AssumptionSet
         "<=" => SymbolFacts.None with { Real = true, Hi = v, HiStrict = false, NonZero = v < 0 },
         "!=" when v == 0 => SymbolFacts.None with { NonZero = true },
         "==" => SymbolFacts.None with { Real = true, Lo = v, Hi = v, LoStrict = false, HiStrict = false },
-        _ => throw new MathException($"assume: unsupported relation {op}."),
+        _ => throw new MathException(Messages.T("assume: unsupported relation {0}.", op)),
     };
 
     /// <summary>Human-readable list of the assumptions.</summary>

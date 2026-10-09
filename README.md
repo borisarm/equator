@@ -58,6 +58,10 @@ the front end is WinUI 3 with Win2D typesetting and plotting.
 - Function palette with search, a symbols palette, a variables inspector and a guide with clickable examples.
 - Calculations run on a dedicated engine thread and can be stopped; notebooks saved as `.eqnb` (JSON); copy any output as
   text, LaTeX or an image; light/dark themes; zoom.
+- Eight interface languages: English, Simplified Chinese, Hindi, Spanish, French, Arabic (right to left), Bengali
+  and Brazilian Portuguese. The default follows Windows; the Language menu switches live. Menus, the guide,
+  function descriptions, error messages, `check()` reports and `help()` are translated; command names and maths
+  are the same in every language, so notebooks work everywhere.
 
 **Checking worked solutions**
 
@@ -163,10 +167,14 @@ src/Equator.Core
   Printing/               display tree → plain text, LaTeX, and typesetting boxes
   Parsing/LatexConverter  LaTeX → Equator input lines (used by checklatex)
   Checking/WorkChecker    step-by-step verification of worked solutions
+  Messages.cs             every message shown to people, as English templates a front end can translate
 src/Equator.App
   Rendering/MathLayout.cs box layout with Win2D font metrics (TeX-like spacing and metrics)
   Controls/               MathView, PlotView, SurfaceView, CellControl
   Services/KernelHost.cs  kernel thread (large stack, cooperative abort)
+  Localization/           string lookup (Loc), XAML bindings (Tr), language choice
+  Strings/<lang>.json     interface strings and function descriptions, one table per language
+  Strings/Engine/         engine messages per language, keyed by the English template
 tests/Equator.Core.Tests  unit and oracle tests (results checked against independent computations)
 ```
 
@@ -179,6 +187,9 @@ Design notes:
   keeps matrix multiplication non-commutative while scalar algebra stays canonical.
 - Calculus commands shadow their bound variable while evaluating their arguments, so `diff(x^2, x)` still
   works after `x := 7`.
+- Engine text goes through `Messages.T("Index {0} is out of range 1..{1}.", i, n)`; the app installs a
+  translator keyed by the English template. `TranslationTests` fails when a message or interface string is
+  added without a translation in every language, or when placeholders differ.
 
 ## Limitations
 
@@ -193,6 +204,7 @@ and expression transformations, one step per line, not proofs in prose.
 ## Diagnostics
 
 Unhandled UI errors are logged to `%TEMP%\Equator\equator.log`. For automated visual checks, set
-`EQUATOR_SNAPSHOT=<path.png>` (optionally `EQUATOR_SNAPSHOT_PAGES=n` and `EQUATOR_THEME=dark|light`); the
-app then writes renders of its own window about seven seconds after start. Regenerate the icon with
+`EQUATOR_SNAPSHOT=<path.png>` (optionally `EQUATOR_SNAPSHOT_PAGES=n`, `EQUATOR_SNAPSHOT_DELAY=seconds`,
+`EQUATOR_THEME=dark|light` and `EQUATOR_LANG=<code>`, e.g. `ar`); the app then writes renders of its own window
+about seven seconds after start. Regenerate the icon with
 `python tools/make_icon.py`.

@@ -286,7 +286,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
     private static Expr AddLists(List<ListExpr> lists, Expr scalar)
     {
         int n = lists[0].Items.Count;
-        if (lists.Any(l => l.Items.Count != n)) throw new MathException("Cannot add lists of different lengths.");
+        if (lists.Any(l => l.Items.Count != n)) throw new MathException(Messages.T("Cannot add lists of different lengths."));
         var items = new Expr[n];
         for (int i = 0; i < n; i++)
             items[i] = Plus(lists.Select(l => l.Items[i]).Append(scalar));
@@ -436,7 +436,7 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
     private static Expr MulLists(List<ListExpr> lists, Expr scalar)
     {
         int n = lists[0].Items.Count;
-        if (lists.Any(l => l.Items.Count != n)) throw new MathException("Cannot multiply lists of different lengths elementwise.");
+        if (lists.Any(l => l.Items.Count != n)) throw new MathException(Messages.T("Cannot multiply lists of different lengths elementwise."));
         var items = new Expr[n];
         for (int i = 0; i < n; i++)
             items[i] = Times(lists.Select(l => l.Items[i]).Append(scalar));

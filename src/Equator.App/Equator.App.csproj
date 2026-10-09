@@ -56,6 +56,8 @@
   <!-- Interface strings, one table per language (see Localization/Loc.cs). -->
   <ItemGroup>
     <EmbeddedResource Include="Strings\*.json" LogicalName="Strings.%(Filename).json" />
+    <!-- Engine messages (errors, check() reports, help()), keyed by the English template. -->
+    <EmbeddedResource Include="Strings\Engine\*.json" LogicalName="Engine.%(Filename).json" />
   </ItemGroup>
   <ItemGroup Condition="'$(EquatorPackaged)' == 'true'">
     <AppxManifest Include="Package.appxmanifest" SubType="Designer" />

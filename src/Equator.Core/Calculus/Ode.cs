@@ -21,12 +21,12 @@ public static class Ode
             if (cond is not null) conditions.Add(cond.Value);
             else odes.Add(eq.Lhs - eq.Rhs);
         }
-        if (odes.Count != 1) throw new MathException("dsolve: give exactly one differential equation (plus optional conditions like y(0) = 1).");
+        if (odes.Count != 1) throw new MathException(Messages.T("dsolve: give exactly one differential equation (plus optional conditions like y(0) = 1)."));
 
         // Normalise to an expression G(x, y, y1, ..., yn) = 0 with plain symbols.
         var ode = Normalise(odes[0], y, x);
         int order = OrderOf(ode, y);
-        if (order == 0) throw new MathException("dsolve: the equation contains no derivative of " + y + ".");
+        if (order == 0) throw new MathException(Messages.T("dsolve: the equation contains no derivative of {0}.", y));
         var ys = Enumerable.Range(0, order + 1).Select(k => k == 0 ? (Expr)y : new Sym($"\u0001{y.Name}{k}")).ToList();
         var G = ode.MapBottomUp(e => e is FnExpr { Name: "@d" } d && d.Args[0] == y ? ys[(int)((Num)d.Args[1]).Value.Num] : e);
 
@@ -34,7 +34,7 @@ public static class Ode
         List<Expr> solutions;
         if (TryConstantCoefficients(G, ys, x, constants) is { } linear) solutions = [linear];
         else if (order == 1) solutions = FirstOrder(G, y, ys[1], x, constants[0]);
-        else throw new MathException("dsolve: only linear equations with constant coefficients are supported for order ≥ 2.");
+        else throw new MathException(Messages.T("dsolve: only linear equations with constant coefficients are supported for order ≥ 2."));
 
         if (conditions.Count > 0) solutions = solutions.Select(s => ApplyConditions(s, y, x, conditions, constants)).ToList();
         var lhs = FnExpr.Inert(y.Name, x);
@@ -115,7 +115,7 @@ public static class Ode
         if (forcing.IsZero) return homogeneous;
 
         var particular = VariationOfParameters(basis, forcing / coeffs[n], x);
-        if (particular is null) throw new MathException("dsolve: could not find a particular solution (the required integrals were not found).");
+        if (particular is null) throw new MathException(Messages.T("dsolve: could not find a particular solution (the required integrals were not found)."));
         return homogeneous + Simplifier.Simplify(particular);
     }
 
@@ -169,7 +169,7 @@ public static class Ode
     private static List<Expr> FirstOrder(Expr G, Sym y, Expr y1, Sym x, Expr C)
     {
         var slopes = Solver.SolveFor(G, y1, out _);
-        if (slopes.Count == 0) throw new MathException("dsolve: could not solve the equation for " + y.Name + "'.");
+        if (slopes.Count == 0) throw new MathException(Messages.T("dsolve: could not solve the equation for {0}'.", y.Name));
         var g = slopes[0]; // y' = g(x, y)
 
         // Linear: y' = a1(x) y + a0(x)
@@ -195,11 +195,11 @@ public static class Ode
         {
             if (f.FreeOf(y)) A *= f;
             else if (f.FreeOf(x)) B *= f;
-            else throw new MathException("dsolve: this first-order equation is neither linear nor separable.");
+            else throw new MathException(Messages.T("dsolve: this first-order equation is neither linear nor separable."));
         }
         var H = Integrator.Antiderivative(Expr.One / B, y);
         var K = Integrator.Antiderivative(A, x);
-        if (H is null || K is null) throw new MathException("dsolve: could not integrate the separated equation.");
+        if (H is null || K is null) throw new MathException(Messages.T("dsolve: could not integrate the separated equation."));
         var implicitEq = H - K - C;
         try
         {
@@ -207,7 +207,7 @@ public static class Ode
             if (!numeric && explicitSols.Count > 0) return explicitSols.Select(Simplifier.Simplify).ToList();
         }
         catch (MathException) { }
-        throw new MathException($"dsolve: implicit solution {H} = {K} + {C}.");
+        throw new MathException(Messages.T("dsolve: implicit solution {0} = {1} + {2}.", H, K, C));
     }
 
     // ---- initial conditions --------------------------------------------------------------------------
@@ -222,7 +222,7 @@ public static class Ode
         }
         var used = constants.Where(c => !sol.FreeOf(c)).ToList();
         var result = Solver.Solve(Expr.List(eqs), Expr.List(used));
-        if (result is not ListExpr { Items.Count: > 0 } sols) throw new MathException("dsolve: the initial conditions are inconsistent.");
+        if (result is not ListExpr { Items.Count: > 0 } sols) throw new MathException(Messages.T("dsolve: the initial conditions are inconsistent."));
         var first = sols.Items[0];
         var rules = first is ListExpr fl ? fl.Items : [first];
         var map = rules.Cast<EqExpr>().ToDictionary(r => r.Lhs, r => r.Rhs);

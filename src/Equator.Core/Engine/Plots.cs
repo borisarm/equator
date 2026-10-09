@@ -10,11 +10,11 @@ internal static class Plots
     {
         var extra = f.FreeSymbols().Where(s => !allowed.Contains(s)).Select(s => s.Name).ToList();
         if (extra.Count > 0)
-            throw new MathException($"{fn}: the expression contains {string.Join(", ", extra)}, which have no value. Assign them first (e.g. {extra[0]} := 1).");
+            throw new MathException(Messages.T("{0}: the expression contains {1}, which have no value. Assign them first (e.g. {2} := 1).", fn, string.Join(", ", extra), extra[0]));
     }
 
     private static Sym Var(Expr e, string fn) =>
-        e is Sym s && !s.IsSpecial ? s : throw new MathException($"{fn}: expected a variable name, got {e}.");
+        e is Sym s && !s.IsSpecial ? s : throw new MathException(Messages.T("{0}: expected a variable name, got {1}.", fn, e));
 
     private static double Dbl(Expr e, string what)
     {
@@ -23,22 +23,22 @@ internal static class Plots
             var v = NumericEval.EvalReal(e);
             if (double.IsFinite(v)) return v;
         }
-        throw new MathException($"{what} must be a finite real number, got {e}.");
+        throw new MathException(Messages.T("{0} must be a finite real number, got {1}.", Messages.T(what), e));
     }
 
     private static (Sym X, double A, double B, int Next) Range(Expr[] a, int i, string fn)
     {
         if (a.Length > i && a[i] is ListExpr { Items.Count: 3 } l)
             return (Var(l.Items[0], fn), Dbl(l.Items[1], "Range start"), Dbl(l.Items[2], "Range end"), i + 1);
-        if (a.Length < i + 3) throw new MathException($"{fn}: give a variable and range, e.g. {fn}(f, x, -5, 5).");
+        if (a.Length < i + 3) throw new MathException(Messages.T("{0}: give a variable and range, e.g. {0}(f, x, -5, 5).", fn));
         return (Var(a[i], fn), Dbl(a[i + 1], "Range start"), Dbl(a[i + 2], "Range end"), i + 3);
     }
 
     public static Expr Plot2D(Expr[] a)
     {
         var fs = a[0] is ListExpr l && !LinearAlgebra2.IsPointList(l) ? l.Items.ToList() : [a[0]];
-        var (x, lo, hi, next) = a.Length >= 2 ? Range(a, 1, "plot") : throw new MathException("plot: give a variable and range, e.g. plot(sin(x), x, -5, 5).");
-        if (lo >= hi) throw new MathException("plot: the range start must be less than the end.");
+        var (x, lo, hi, next) = a.Length >= 2 ? Range(a, 1, "plot") : throw new MathException(Messages.T("plot: give a variable and range, e.g. plot(sin(x), x, -5, 5)."));
+        if (lo >= hi) throw new MathException(Messages.T("plot: the range start must be less than the end."));
         var spec = new PlotSpec { XMin = lo, XMax = hi, XLabel = x.Name, YLabel = "" };
         if (a.Length >= next + 2)
         {
@@ -57,12 +57,12 @@ internal static class Plots
     public static Expr Parametric(Expr[] a)
     {
         var (t, lo, hi, _) = Range(a, 1, "parametricplot");
-        if (a[0] is not ListExpr l) throw new MathException("parametricplot: expected [x(t), y(t)].");
+        if (a[0] is not ListExpr l) throw new MathException(Messages.T("parametricplot: expected [x(t), y(t)]."));
         var curves = l.Items.All(i => i is ListExpr { Items.Count: 2 }) ? l.Items.Cast<ListExpr>().ToList() : [l];
         var spec = new PlotSpec { XMin = 0, XMax = 1, EqualAspect = true, XLabel = "x", YLabel = "y" };
         foreach (var c in curves)
         {
-            if (c.Items.Count != 2) throw new MathException("parametricplot: each curve needs two components [x(t), y(t)].");
+            if (c.Items.Count != 2) throw new MathException(Messages.T("parametricplot: each curve needs two components [x(t), y(t)]."));
             CheckOnly(c, [t], "parametricplot");
             var fx = NumericEval.Compile1(c.Items[0], t.Name);
             var fy = NumericEval.Compile1(c.Items[1], t.Name);
@@ -113,7 +113,7 @@ internal static class Plots
 
     public static Expr ListPlot(Expr[] a)
     {
-        if (a[0] is not ListExpr l) throw new MathException("listplot: expected a list.");
+        if (a[0] is not ListExpr l) throw new MathException(Messages.T("listplot: expected a list."));
         var pts = new List<(double, double)>();
         int i = 1;
         foreach (var item in l.Items)
@@ -122,7 +122,7 @@ internal static class Plots
             else pts.Add((i, Dbl(item, "Value")));
             i++;
         }
-        if (pts.Count == 0) throw new MathException("listplot: the list is empty.");
+        if (pts.Count == 0) throw new MathException(Messages.T("listplot: the list is empty."));
         bool join = a.Length > 1 && a[1] is Sym { Name: "True" or "joined" or "line" };
         var spec = new PlotSpec { XLabel = "x", YLabel = "y" };
         spec.Series.Add(new PlotSeries { Label = "data", Points = pts, JoinPoints = join });

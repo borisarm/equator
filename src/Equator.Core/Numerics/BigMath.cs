@@ -82,7 +82,7 @@ public static class BigMath
     public static BigFloat Exp(BigFloat x, int precision)
     {
         if (x.IsZero) return BigFloat.FromInteger(1, precision);
-        if (x.Log2Magnitude > 40) throw new MathException("Number too large for exp.");
+        if (x.Log2Magnitude > 40) throw new MathException(Messages.T("Number too large for exp."));
         // x = k ln 2 + r, |r| ≤ ln2/2; then exp(r) = exp(r / 2^s)^(2^s).
         long magnitude = Math.Max(0, x.Log2Magnitude + 2);
         int wp = precision + Guard + (int)magnitude;
@@ -108,7 +108,7 @@ public static class BigMath
 
     public static BigFloat Log(BigFloat x, int precision)
     {
-        if (x.Sign <= 0) throw new MathException("Logarithm of a non-positive number.");
+        if (x.Sign <= 0) throw new MathException(Messages.T("Logarithm of a non-positive number."));
         int wp = precision + Guard;
         // x = m · 2^e with m in [1/sqrt2, sqrt2): log x = e ln2 + 2 atanh((m − 1)/(m + 1)).
         long e = x.Log2Magnitude;
@@ -259,7 +259,7 @@ public static class BigMath
         {
             // Γ(x) = π / (sin(πx) Γ(1 − x))
             var (s, _) = SinCos(Pi(wp) * xr, wp);
-            if (s.IsZero || s.Log2Magnitude < -wp + 8) throw new MathException("Gamma has a pole here.");
+            if (s.IsZero || s.Log2Magnitude < -wp + 8) throw new MathException(Messages.T("Gamma has a pole here."));
             return BigFloat.Divide(Pi(wp), s * Gamma(one - xr, wp), precision);
         }
         // Shift: Γ(x) = Γ(x + N) / (x (x+1) ... (x+N−1)), with x + N large enough for the Stirling series.

@@ -14,7 +14,7 @@ public static class Inequalities
     public static IEnumerable<(string Op, Expr F)> Conditions(Expr rel)
     {
         if (rel is not FnExpr { Name: "@rel" } r || r.Args[0] is not StrExpr op)
-            throw new MathException("solve: expected an inequality.");
+            throw new MathException(Messages.T("solve: expected an inequality."));
         var lhs = r.Args[1];
         if (lhs is FnExpr { Name: "@rel" } inner)
         {
@@ -30,9 +30,9 @@ public static class Inequalities
         foreach (var (_, f) in conditions)
         {
             if (f.FreeSymbols().Any(s => s != x))
-                throw new MathException("solve: inequalities can only contain the variable being solved for.");
+                throw new MathException(Messages.T("solve: inequalities can only contain the variable being solved for."));
             if (f.ContainsAny(z => z is FnExpr { Name: "sin" or "cos" or "tan" or "cot" or "sec" or "csc" } t && !t.Args[0].FreeOf(x)))
-                throw new MathException("solve: inequalities with periodic functions are not supported.");
+                throw new MathException(Messages.T("solve: inequalities with periodic functions are not supported."));
         }
 
         var cuts = new List<(double Value, Expr Exact)>();
@@ -80,7 +80,7 @@ public static class Inequalities
             "<=" => v <= 0,
             ">=" => v >= 0,
             "!=" => v != 0,
-            _ => throw new MathException($"solve: unknown relation {op}."),
+            _ => throw new MathException(Messages.T("solve: unknown relation {0}.", op)),
         };
 
         bool TestAt(double t) => conditions.All(c => TestAtOne(c.Op, c.F, t));

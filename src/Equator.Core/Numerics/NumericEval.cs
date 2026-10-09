@@ -22,7 +22,7 @@ public static class NumericEval
                     case "Undefined": return double.NaN;
                 }
                 if (vars is not null && vars.TryGetValue(s.Name, out var v)) return v;
-                throw new MathException($"Cannot evaluate '{s.Name}' numerically: it has no value.");
+                throw new MathException(Messages.T("Cannot evaluate '{0}' numerically: it has no value.", s.Name));
             case AddExpr a:
                 {
                     Complex sum = 0;
@@ -47,7 +47,7 @@ public static class NumericEval
             case FnExpr f:
                 return EvalFunction(f.Name, f.Args.Select(a => Eval(a, vars)).ToArray());
         }
-        throw new MathException($"Cannot evaluate {e} numerically.");
+        throw new MathException(Messages.T("Cannot evaluate {0} numerically.", e));
     }
 
     public static double EvalReal(Expr e)
@@ -142,7 +142,7 @@ public static class NumericEval
             case "mod": return a[0].Real - a[1].Real * Math.Floor(a[0].Real / a[1].Real);
             case "binomial": return Gamma(a[0].Real + 1) / (Gamma(a[1].Real + 1) * Gamma(a[0].Real - a[1].Real + 1));
         }
-        throw new MathException($"Cannot evaluate function '{name}' numerically.");
+        throw new MathException(Messages.T("Cannot evaluate function '{0}' numerically.", name));
     }
 
     // Lanczos approximation (g = 7, n = 9).

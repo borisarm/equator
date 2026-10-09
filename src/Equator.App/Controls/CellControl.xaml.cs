@@ -275,6 +275,7 @@ public sealed partial class CellControl : UserControl
     private static FrameworkElement TextContent(CellOutput output) => new TextBlock
     {
         Text = output.Text,
+        FlowDirection = Direction(output.Text),
         FontFamily = new FontFamily("Cascadia Mono, Consolas"),
         FontSize = 13,
         TextWrapping = TextWrapping.Wrap,
@@ -285,7 +286,7 @@ public sealed partial class CellControl : UserControl
 
     private static FrameworkElement ErrorContent(CellOutput output)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 2, 0, 2) };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 2, 0, 2), FlowDirection = Direction(output.Text) };
         panel.Children.Add(new FontIcon
         {
             Glyph = "",
@@ -301,6 +302,15 @@ public sealed partial class CellControl : UserControl
         });
         return panel;
     }
+
+    /// <summary>
+    /// Results read left to right, but messages and reports from the engine are in the interface language: text
+    /// containing right-to-left script (Arabic) is laid out right to left.
+    /// </summary>
+    private static FlowDirection Direction(string text) =>
+        text.Any(c => c is >= '\u0590' and <= '\u08FF' or >= '\uFB1D' and <= '\uFDFF' or >= '\uFE70' and <= '\uFEFC')
+            ? FlowDirection.RightToLeft
+            : FlowDirection.LeftToRight;
 
     private static void AddItem(MenuFlyout menu, string text, string glyph, Action action)
     {

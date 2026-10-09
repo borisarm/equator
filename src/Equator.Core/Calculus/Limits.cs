@@ -16,7 +16,7 @@ public static class Limits
 
     private static Expr LimitCore(Expr f, Expr x, Expr a, int dir)
     {
-        if (x is not Sym) throw new MathException("Limit variable must be a symbol.");
+        if (x is not Sym) throw new MathException(Messages.T("Limit variable must be a symbol."));
         if (f.FreeOf(x)) return f;
         if (f is ListExpr l) return Expr.List(l.Items.Select(i => Limit(i, x, a, dir)));
 

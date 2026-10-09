@@ -18,7 +18,7 @@ public static class Integrator
 
     private static Expr? AntiderivativeCore(Expr f, Expr x)
     {
-        if (x is not Sym) throw new MathException("Integration variable must be a symbol.");
+        if (x is not Sym) throw new MathException(Messages.T("Integration variable must be a symbol."));
         var r = Integrate(f, x, 0);
         if (r is null) return null;
         r = Tidy(r);
@@ -750,7 +750,7 @@ public static class Integrator
         if (numeric is { } nres)
         {
             if (!double.IsFinite(nres.Value) || nres.Error > 1e-3 * (1 + Math.Abs(nres.Value)))
-                throw new MathException("The integral does not appear to converge.");
+                throw new MathException(Messages.T("The integral does not appear to converge."));
             return new Real(nres.Value);
         }
         if (F is null) return FnExpr.Inert("integrate", f, x, a, b);
@@ -764,7 +764,7 @@ public static class Integrator
         if (e == Expr.Infinity) return double.PositiveInfinity;
         if (e.IsInfinite && e.HasNegativeCoefficient) return double.NegativeInfinity;
         var v = NumericEval.EvalReal(e);
-        if (double.IsNaN(v)) throw new MathException("Integration limits must be real.");
+        if (double.IsNaN(v)) throw new MathException(Messages.T("Integration limits must be real."));
         return v;
     }
 
@@ -779,7 +779,7 @@ public static class Integrator
     }
 
     /// <summary>Thrown when an integral is known to diverge.</summary>
-    public sealed class DivergenceException() : MathException("The integral diverges.");
+    public sealed class DivergenceException() : MathException(Messages.T("The integral diverges."));
 
     /// <summary>
     /// Finds the points of [lo, hi] where f may be singular (zeros of denominators, of log arguments and of

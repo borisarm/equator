@@ -56,14 +56,14 @@ public static class Builtins
     private static Sym Var(Expr e, string fn)
     {
         if (e is Sym s && !s.IsSpecial) return s;
-        throw new MathException($"{fn}: expected a variable name but got {e}. (Has it been assigned a value? Use clear({e}).)");
+        throw new MathException(Messages.T("{0}: expected a variable name but got {1}. (Has it been assigned a value? Use clear({1}).)", fn, e));
     }
 
     private static int Int(Expr e, string what)
     {
         if (e is Num { Value.IsInteger: true } n && BigInteger.Abs(n.Value.Num) < int.MaxValue) return (int)n.Value.Num;
         if (e is Real r && r.Value == Math.Floor(r.Value) && Math.Abs(r.Value) < int.MaxValue) return (int)r.Value;
-        throw new MathException($"{what} must be an integer, got {e}.");
+        throw new MathException(Messages.T("{0} must be an integer, got {1}.", Messages.T(what), e));
     }
 
     private static double Dbl(Expr e, string what)
@@ -75,18 +75,18 @@ public static class Builtins
         }
         if (e == Expr.Infinity) return double.PositiveInfinity;
         if (e.IsInfinite && e.HasNegativeCoefficient) return double.NegativeInfinity;
-        throw new MathException($"{what} must be a real number, got {e}.");
+        throw new MathException(Messages.T("{0} must be a real number, got {1}.", Messages.T(what), e));
     }
 
     private static List<Expr> Items(Expr e, string fn) =>
-        e is ListExpr l ? [.. l.Items] : throw new MathException($"{fn}: expected a list, got {e}.");
+        e is ListExpr l ? [.. l.Items] : throw new MathException(Messages.T("{0}: expected a list, got {1}.", fn, e));
 
     /// <summary>Accepts (x, a, b) or ([x, a, b]) starting at index i.</summary>
     private static (Sym Var, Expr A, Expr B, int Next) Range(Expr[] a, int i, string fn)
     {
         if (a.Length > i && a[i] is ListExpr { Items.Count: 3 } l)
             return (Var(l.Items[0], fn), l.Items[1], l.Items[2], i + 1);
-        if (a.Length < i + 3) throw new MathException($"{fn}: expected a variable and a range, e.g. {fn}(..., x, 0, 1).");
+        if (a.Length < i + 3) throw new MathException(Messages.T("{0}: expected a variable and a range, e.g. {0}(..., x, 0, 1).", fn));
         return (Var(a[i], fn), a[i + 1], a[i + 2], i + 3);
     }
 
@@ -116,7 +116,7 @@ public static class Builtins
                 if (a.Length == 2 && a[1] is ListExpr) { var (v0, lo, hi, _) = Range(a, 1, "integrate"); return Integrator.Definite(a[0], v0, lo, hi); }
                 var x = Var(a[1], "integrate");
                 if (a.Length == 4) return Integrator.Definite(a[0], x, a[2], a[3]);
-                if (a.Length == 3) throw new MathException("integrate: give both limits, e.g. integrate(f, x, 0, 1).");
+                if (a.Length == 3) throw new MathException(Messages.T("integrate: give both limits, e.g. integrate(f, x, 0, 1)."));
                 return Integrator.Antiderivative(a[0], x) ?? FnExpr.Inert("integrate", a[0], x);
             }, 1);
         Add("nintegrate", Calc, "nintegrate(f, x, a, b)", "Numerical integration (adaptive Gauss–Kronrod; infinite limits allowed).",
@@ -125,7 +125,7 @@ public static class Builtins
                 var (x, lo, hi, _) = Range(a, 1, "nintegrate");
                 var f = NumericEval.Compile1(a[0], x.Name);
                 var (v, err) = NumericMethods.Integrate(f, Dbl(lo, "Lower limit"), Dbl(hi, "Upper limit"));
-                if (!double.IsFinite(v) || err > 1e-3 * (1 + Math.Abs(v))) throw new MathException("The integral does not appear to converge.");
+                if (!double.IsFinite(v) || err > 1e-3 * (1 + Math.Abs(v))) throw new MathException(Messages.T("The integral does not appear to converge."));
                 return new Real(v);
             }, 1);
         Add("limit", Calc, "limit(f, x, a)  ·  limit(f, x, a, \"+\")", "Limit of f as x → a (two-sided, or one-sided with \"+\" / \"-\"). a may be oo or -oo.",
@@ -142,7 +142,7 @@ public static class Builtins
                         Sym { Name: "left" or "minus" } => -1,
                         Num n when n.Value.Sign > 0 => 1,
                         Num n when n.Value.Sign < 0 => -1,
-                        _ => throw new MathException("limit: direction must be \"+\" or \"-\"."),
+                        _ => throw new MathException(Messages.T("limit: direction must be \"+\" or \"-\".")),
                     };
                 }
                 return Limits.Limit(a[0], Var(a[1], "limit"), a[2], dir);
@@ -180,7 +180,7 @@ public static class Builtins
             (k, a) =>
             {
                 var f = Items(a[0], "divergence"); var vars = Items(a[1], "divergence");
-                if (f.Count != vars.Count) throw new MathException("divergence: field and variables must have the same length.");
+                if (f.Count != vars.Count) throw new MathException(Messages.T("divergence: field and variables must have the same length."));
                 return Expr.Plus(f.Zip(vars, (fi, v) => Derivative.Diff(fi, Var(v, "divergence"))));
             }, 1);
         Add("laplacian", Calc, "laplacian(f, [x, y, ...])", "Sum of unmixed second derivatives.", "laplacian(x^2 + y^2, [x, y])", 2, 2,
@@ -213,28 +213,28 @@ public static class Builtins
                 else
                     foreach (var c in a)
                     {
-                        if (c is Sym { Name: "False" }) throw new MathException("assume: this contradicts the current assumptions or values.");
+                        if (c is Sym { Name: "False" }) throw new MathException(Messages.T("assume: this contradicts the current assumptions or values."));
                         set = set.Add(c);
                     }
                 k.Assumptions = set;
-                return new StrExpr("Assuming " + string.Join("; ", set.Describe()) + ".");
+                return new StrExpr(Messages.T("Assuming {0}.", string.Join("; ", set.Describe())));
             });
         AddLazy("forget", Assume, "forget(x, ...)  ·  forget()", "Removes assumptions about the given variables (all of them without arguments).", "forget(x)", 0, 10, (k, raw) =>
         {
-            if (raw.Count == 0) { k.Assumptions = AssumptionSet.Empty; return new StrExpr("All assumptions removed."); }
+            if (raw.Count == 0) { k.Assumptions = AssumptionSet.Empty; return new StrExpr(Messages.T("All assumptions removed.")); }
             var set = k.Assumptions;
             foreach (var r in raw)
             {
-                if (r is not Sym s) throw new MathException("forget: expected variable names.");
+                if (r is not Sym s) throw new MathException(Messages.T("forget: expected variable names."));
                 set = set.Without(s.Name);
             }
             k.Assumptions = set;
-            return new StrExpr("Forgot assumptions about " + string.Join(", ", raw) + ".");
+            return new StrExpr(Messages.T("Forgot assumptions about {0}.", string.Join(", ", raw)));
         });
         Add("assumptions", Assume, "assumptions()", "Lists the assumptions in effect.", "assumptions()", 0, 0, (k, a) =>
         {
             var lines = k.Assumptions.Describe().ToList();
-            return new StrExpr(lines.Count == 0 ? "No assumptions." : string.Join("\n", lines));
+            return new StrExpr(lines.Count == 0 ? Messages.T("No assumptions.") : string.Join("\n", lines));
         });
         Add("refine", Assume, "refine(expr, x > 0, ...)", "Re-evaluates an expression under the current (plus extra) assumptions: sqrt(x^2) → x, abs, sign, (−1)^(2n), sin(n π), ...",
             "refine(sqrt(x^2)*abs(y), x > 0, y < 0)", 1, 10, (k, a) => WithConditions(a.Skip(1), () => Assumptions.Refine(a[0])));
@@ -259,17 +259,17 @@ public static class Builtins
             "resultant(x^2 - a, x - b, x)", 3, 3, (k, a) =>
             {
                 var x = Var(a[2], "resultant");
-                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException("resultant: not a polynomial in " + x + ".");
-                var cq = PolyView.Coefficients(a[1], x) ?? throw new MathException("resultant: not a polynomial in " + x + ".");
+                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException(Messages.T("resultant: not a polynomial in {0}.", x));
+                var cq = PolyView.Coefficients(a[1], x) ?? throw new MathException(Messages.T("resultant: not a polynomial in {0}.", x));
                 return Factoring.Factor(Expansion.Expand(Solver.Resultant(cp, cq)));
             }, 2);
         Add("discriminant", Alg, "discriminant(p, x)", "Discriminant of a polynomial in x (zero exactly when it has a repeated root).",
             "discriminant(a*x^2 + b*x + c, x)", 2, 2, (k, a) =>
             {
                 var x = Var(a[1], "discriminant");
-                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException("discriminant: not a polynomial in " + x + ".");
+                var cp = PolyView.Coefficients(a[0], x) ?? throw new MathException(Messages.T("discriminant: not a polynomial in {0}.", x));
                 int n = cp.Count - 1;
-                if (n < 1) throw new MathException("discriminant: the polynomial must have positive degree.");
+                if (n < 1) throw new MathException(Messages.T("discriminant: the polynomial must have positive degree."));
                 var dp = PolyView.Coefficients(Calculus.Derivative.Diff(a[0], x), x)!;
                 var sign = (n * (n - 1) / 2) % 2 == 0 ? Expr.One : Expr.MinusOne;
                 return Factoring.Factor(Rational.Cancel(sign * Solver.Resultant(cp, dp) / cp[n]));
@@ -280,21 +280,21 @@ public static class Builtins
             (k, a) => Rational.Cancel(a[0]));
         Add("apart", Alg, "apart(expr, x)", "Partial fraction decomposition.", "apart(1/(x^2 - 1), x)", 1, 2, (k, a) =>
         {
-            var x = a.Length > 1 ? Var(a[1], "apart") : a[0].FreeSymbols().FirstOrDefault() ?? throw new MathException("apart: no variable.");
+            var x = a.Length > 1 ? Var(a[1], "apart") : a[0].FreeSymbols().FirstOrDefault() ?? throw new MathException(Messages.T("apart: no variable."));
             return Rational.Apart(a[0], x);
         }, 1);
         Add("collect", Alg, "collect(expr, x)", "Groups terms by powers of x.", "collect(a*x + b*x + c, x)", 2, 2, (k, a) =>
         {
             var x = Var(a[1], "collect");
-            var c = PolyView.Coefficients(a[0], x) ?? throw new MathException("collect: expression is not a polynomial in " + x + ".");
+            var c = PolyView.Coefficients(a[0], x) ?? throw new MathException(Messages.T("collect: expression is not a polynomial in {0}.", x));
             return Expr.Plus(c.Select((ci, i) => Factoring.Factor(ci) * Expr.Power(x, i)));
         }, 1);
         Add("coeffs", Alg, "coeffs(p, x)", "Coefficients of a polynomial, from the constant term upwards.", "coeffs(3x^2 + 2x + 1, x)", 2, 2, (k, a) =>
-            Expr.List(PolyView.Coefficients(a[0], Var(a[1], "coeffs")) ?? throw new MathException("coeffs: not a polynomial.")), 1);
+            Expr.List(PolyView.Coefficients(a[0], Var(a[1], "coeffs")) ?? throw new MathException(Messages.T("coeffs: not a polynomial."))), 1);
         Add("degree", Alg, "degree(p, x)", "Degree of a polynomial in x.", "degree(x^5 + x, x)", 2, 2, (k, a) =>
         {
             var d = PolyView.Degree(a[0], Var(a[1], "degree"));
-            if (d < 0) throw new MathException("degree: not a polynomial.");
+            if (d < 0) throw new MathException(Messages.T("degree: not a polynomial."));
             return d;
         }, 1);
         Add("numer", Alg, "numer(expr)", "Numerator after combining fractions.", "numer((x+1)/(x-1))", 1, 1, (k, a) => Rational.NumDen(Rational.Together(a[0])).Num);
@@ -319,13 +319,13 @@ public static class Builtins
                 var map = new Dictionary<Expr, Expr>();
                 foreach (var r in rules)
                 {
-                    if (r is not EqExpr eq) throw new MathException("subs: use equations like x = 2.");
+                    if (r is not EqExpr eq) throw new MathException(Messages.T("subs: use equations like x = 2."));
                     map[eq.Lhs] = eq.Rhs;
                 }
                 return a[0].Substitute(map);
             });
-        Add("lhs", Alg, "lhs(eq)", "Left-hand side of an equation.", "lhs(x^2 = 4)", 1, 1, (k, a) => a[0] is EqExpr q ? q.Lhs : throw new MathException("lhs: not an equation."));
-        Add("rhs", Alg, "rhs(eq)", "Right-hand side of an equation.", "rhs(x^2 = 4)", 1, 1, (k, a) => a[0] is EqExpr q ? q.Rhs : throw new MathException("rhs: not an equation."));
+        Add("lhs", Alg, "lhs(eq)", "Left-hand side of an equation.", "lhs(x^2 = 4)", 1, 1, (k, a) => a[0] is EqExpr q ? q.Lhs : throw new MathException(Messages.T("lhs: not an equation.")));
+        Add("rhs", Alg, "rhs(eq)", "Right-hand side of an equation.", "rhs(x^2 = 4)", 1, 1, (k, a) => a[0] is EqExpr q ? q.Rhs : throw new MathException(Messages.T("rhs: not an equation.")));
 
         // Numeric
         Add("N", Num, "N(expr)  ·  N(expr, digits)", "Numerical value: machine precision, or the given number of significant digits.",
@@ -333,7 +333,7 @@ public static class Builtins
             {
                 if (a.Length == 1) return ToNumeric(a[0]);
                 int digits = Int(a[1], "Digits");
-                if (digits < 1 || digits > 20000) throw new MathException("N: digits must be between 1 and 20000.");
+                if (digits < 1 || digits > 20000) throw new MathException(Messages.T("N: digits must be between 1 and 20000."));
                 return ToNumeric(a[0], digits);
             });
         Add("identify", Num, "identify(x)", "Recognises a decimal number as an exact constant (rational, algebraic of small degree, combinations of π, e, logs and square roots).",
@@ -345,7 +345,7 @@ public static class Builtins
                     Real { Big: { } b } r => (b, r.Digits),
                     Real r => (BigFloat.FromDouble(r.Value, 64), 15),
                     _ when x.IsConstant && !x.IsUndefinedOrInfinite => (BigEval.Eval(x, BigFloat.DigitsToBits(60)).Re, 60),
-                    _ => throw new MathException("identify: expected a number."),
+                    _ => throw new MathException(Messages.T("identify: expected a number.")),
                 };
                 return Identify.Constant(value, digits) ?? x;
             });
@@ -365,7 +365,7 @@ public static class Builtins
         Add("prime", NT, "prime(n)", "The n-th prime number.", "prime(100)", 1, 1, (k, a) =>
         {
             int n = Int(a[0], "n");
-            if (n < 1 || n > 2_000_000) throw new MathException("prime(n) needs 1 ≤ n ≤ 2000000.");
+            if (n < 1 || n > 2_000_000) throw new MathException(Messages.T("prime(n) needs 1 ≤ n ≤ 2000000."));
             // p_n < n (ln n + ln ln n) for n >= 6
             int limit = n < 6 ? 15 : (int)(n * (Math.Log(n) + Math.Log(Math.Log(n)))) + 1;
             var composite = new bool[limit + 1];
@@ -376,13 +376,13 @@ public static class Builtins
                 if (++count == n) return new Num(p);
                 for (long m = (long)p * p; m <= limit; m += p) composite[m] = true;
             }
-            throw new MathException("prime(n): internal bound exceeded.");
+            throw new MathException(Messages.T("prime(n): internal bound exceeded."));
         });
         Add("divisors", NT, "divisors(n)", "Positive divisors.", "divisors(60)", 1, 1, (k, a) => Expr.List(IntMath.Divisors(BigIntArg(a[0], "divisors")).Select(d => (Expr)new Num(d))));
         Add("fibonacci", NT, "fibonacci(n)", "The n-th Fibonacci number.", "fibonacci(50)", 1, 1, (k, a) =>
         {
             int n = Int(a[0], "n");
-            if (n < 0 || n > 100000) throw new MathException("fibonacci(n) needs 0 ≤ n ≤ 100000.");
+            if (n < 0 || n > 100000) throw new MathException(Messages.T("fibonacci(n) needs 0 ≤ n ≤ 100000."));
             BigInteger x = 0, y = 1;
             for (int i = 0; i < n; i++) (x, y) = (y, x + y);
             return new Num(x);
@@ -426,10 +426,10 @@ public static class Builtins
         // Lists & statistics
         AddLazy("table", Lists, "table(expr, i, a, b)  ·  table(expr, i, a, b, step)", "List of expr for i from a to b.", "table(i^2, i, 1, 10)", 4, 5, (k, raw) =>
         {
-            if (raw[1] is not Sym { IsSpecial: false } i) throw new MathException("table: expected a variable name as the second argument.");
+            if (raw[1] is not Sym { IsSpecial: false } i) throw new MathException(Messages.T("table: expected a variable name as the second argument."));
             var lo = k.Eval(raw[2]); var hi = k.Eval(raw[3]); var step = raw.Count > 4 ? k.Eval(raw[4]) : Expr.One;
             double dlo = Dbl(lo, "Start"), dhi = Dbl(hi, "End"), ds = Dbl(step, "Step");
-            if (ds == 0 || (dhi - dlo) / ds > 100000) throw new MathException("table: too many elements.");
+            if (ds == 0 || (dhi - dlo) / ds > 100000) throw new MathException(Messages.T("table: too many elements."));
             var items = new List<Expr>();
             int count = (int)Math.Floor((dhi - dlo) / ds + 1e-9) + 1;
             // Evaluate the body for each value, so that commands like prime(n) see a number.
@@ -441,7 +441,7 @@ public static class Builtins
         {
             Expr lo = a.Length == 1 ? Expr.One : a[0], hi = a.Length == 1 ? a[0] : a[1], step = a.Length > 2 ? a[2] : Expr.One;
             double dlo = Dbl(lo, "Start"), dhi = Dbl(hi, "End"), ds = Dbl(step, "Step");
-            if (ds == 0 || (dhi - dlo) / ds > 100000) throw new MathException("range: too many elements.");
+            if (ds == 0 || (dhi - dlo) / ds > 100000) throw new MathException(Messages.T("range: too many elements."));
             int count = (int)Math.Floor((dhi - dlo) / ds + 1e-9) + 1;
             return Expr.List(Enumerable.Range(0, Math.Max(0, count)).Select(j => lo + step * j));
         });
@@ -452,13 +452,13 @@ public static class Builtins
         Add("mean", Lists, "mean(list)", "Arithmetic mean.", "mean([1, 2, 3, 10])", 1, 1, (k, a) =>
         {
             var l = Items(a[0], "mean");
-            if (l.Count == 0) throw new MathException("mean of an empty list.");
+            if (l.Count == 0) throw new MathException(Messages.T("mean of an empty list."));
             return Expr.Plus(l) / l.Count;
         });
         Add("median", Lists, "median(list)", "Median of numbers.", "median([3, 1, 4, 1, 5])", 1, 1, (k, a) =>
         {
             var l = Items(a[0], "median").OrderBy(x => Dbl(x, "median element")).ToList();
-            if (l.Count == 0) throw new MathException("median of an empty list.");
+            if (l.Count == 0) throw new MathException(Messages.T("median of an empty list."));
             return l.Count % 2 == 1 ? l[l.Count / 2] : (l[l.Count / 2 - 1] + l[l.Count / 2]) / 2;
         });
         Add("variance", Lists, "variance(list)", "Sample variance.", "variance([1, 2, 3, 4])", 1, 1, (k, a) => Variance(Items(a[0], "variance")));
@@ -487,22 +487,22 @@ public static class Builtins
         {
             foreach (var r in raw)
             {
-                if (r is not Sym s) throw new MathException("clear: expected names.");
+                if (r is not Sym s) throw new MathException(Messages.T("clear: expected names."));
                 k.Clear(s.Name);
             }
-            return new StrExpr("Cleared " + string.Join(", ", raw) + ".");
+            return new StrExpr(Messages.T("Cleared {0}.", string.Join(", ", raw)));
         });
         AddLazy("clearall", Util, "clearall()", "Removes all variables, functions and history.", "clearall()", 0, 0, (k, raw) =>
         {
             k.Reset();
-            return new StrExpr("All definitions cleared.");
+            return new StrExpr(Messages.T("All definitions cleared."));
         });
         AddLazy("if", Util, "if(condition, then, else)", "Conditional evaluation (useful in recursive definitions).", "f(n) := if(n <= 1, 1, n*f(n - 1))", 2, 3, (k, raw) =>
         {
             var c = k.Eval(raw[0]);
             if (c is Sym { Name: "True" } || (c.IsNumber && !c.IsZero)) return k.Eval(raw[1]);
             if (c is Sym { Name: "False" } || c.IsZero) return raw.Count > 2 ? k.Eval(raw[2]) : new Sym("Null");
-            throw new MathException("if: the condition could not be decided (it may contain unassigned symbols).");
+            throw new MathException(Messages.T("if: the condition could not be decided (it may contain unassigned symbols)."));
         });
         AddLazy("help", Util, "help(name)  ·  help()", "Describes a command, or lists all commands.", "help(integrate)", 0, 1, (k, raw) => new StrExpr(Help(raw)));
         AddLazy("vars", Util, "vars()", "Lists defined variables and functions.", "vars()", 0, 0, (k, raw) =>
@@ -510,7 +510,7 @@ public static class Builtins
             var lines = k.Variables.Select(v => $"{v.Key} = {TextFormatter.Format(v.Value)}")
                 .Concat(k.UserFunctions.Values.Select(f => $"{f.Name}({string.Join(", ", f.Parameters)}) := {TextFormatter.Format(k.WithShadowed(f.Parameters, () => k.Eval(f.Body)))}"));
             var text = string.Join("\n", lines);
-            return new StrExpr(text.Length == 0 ? "No definitions." : text);
+            return new StrExpr(text.Length == 0 ? Messages.T("No definitions.") : text);
         });
     }
 
@@ -523,22 +523,22 @@ public static class Builtins
             {
                 sb.Append(g.Key).Append(": ").AppendLine(string.Join(", ", g.Select(b => b.Name)));
             }
-            sb.Append("Use help(name) for details. Assign with :=, write equations with =, end a line with ; to hide its output.");
+            sb.Append(Messages.T("Use help(name) for details. Assign with :=, write equations with =, end a line with ; to hide its result."));
             return sb.ToString();
         }
         var name = raw[0] switch { Sym s => s.Name, StrExpr str => str.Value, FnExpr { Name: "@call", Args: [Sym fs, ..] } => fs.Name, _ => raw[0].ToString() };
         if (TryGet(name, out var b))
-            return $"{b.Usage}\n{b.Description}\nExample: {b.Example}";
+            return $"{b.Usage}\n{Messages.Description(b)}\n" + Messages.T("Example: {0}", b.Example);
         if (Functions.Numeric.Contains(Canonical(name)) || name is "exp" or "sqrt")
-            return $"{name}(x) is a built-in mathematical function.";
-        return $"No help for '{name}'.";
+            return Messages.T("{0}(x) is a built-in mathematical function.", name);
+        return Messages.T("No help for '{0}'.", name);
     }
 
     private static List<string> StepTexts(Expr e, string fn) => e switch
     {
         ListExpr l when l.Items.All(i => i is StrExpr) => l.Items.Cast<StrExpr>().Select(s => s.Value).ToList(),
         StrExpr s => s.Value.Split('\n').ToList(),
-        _ => throw new MathException($"{fn}: give the steps as a list of strings, e.g. {fn}([\"2x + 3 = 7\", \"x = 2\"])."),
+        _ => throw new MathException(Messages.T("{0}: give the steps as a list of strings, e.g. {0}([\"2x + 3 = 7\", \"x = 2\"]).", fn)),
     };
 
     /// <summary>Runs body with the current assumptions extended by the given conditions.</summary>
@@ -547,7 +547,7 @@ public static class Builtins
         var set = Assumptions.Current;
         foreach (var c in conditions)
         {
-            if (c is Sym { Name: "False" }) throw new MathException("The condition contradicts the current assumptions.");
+            if (c is Sym { Name: "False" }) throw new MathException(Messages.T("The condition contradicts the current assumptions."));
             set = set.Add(c);
         }
         using (Assumptions.Scope(set)) return body();
@@ -557,15 +557,15 @@ public static class Builtins
     {
         var syms = p.FreeSymbols().Union(q.FreeSymbols()).ToList();
         if (syms.Count == 1) return syms[0];
-        throw new MathException($"{fn}: give the variable, e.g. {fn}(p, q, x).");
+        throw new MathException(Messages.T("{0}: give the variable, e.g. {0}(p, q, x).", fn));
     }
 
     /// <summary>Long division in x with coefficients that may involve other symbols (over their fraction field).</summary>
     private static (Expr Quotient, Expr Remainder) PolyDivide(Expr p, Expr q, Sym x)
     {
-        var cp = PolyView.Coefficients(p, x) ?? throw new MathException($"polydiv: {p} is not a polynomial in {x}.");
-        var cq = PolyView.Coefficients(q, x) ?? throw new MathException($"polydiv: {q} is not a polynomial in {x}.");
-        if (cq.Count == 1 && cq[0].IsZero) throw new MathException("polydiv: division by zero.");
+        var cp = PolyView.Coefficients(p, x) ?? throw new MathException(Messages.T("polydiv: {0} is not a polynomial in {1}.", p, x));
+        var cq = PolyView.Coefficients(q, x) ?? throw new MathException(Messages.T("polydiv: {0} is not a polynomial in {1}.", q, x));
+        if (cq.Count == 1 && cq[0].IsZero) throw new MathException(Messages.T("polydiv: division by zero."));
         var rem = cp.ToList();
         int dq = cq.Count - 1;
         var quot = new Expr[Math.Max(rem.Count - dq, 1)];
@@ -582,12 +582,12 @@ public static class Builtins
     }
 
     private static BigInteger BigIntArg(Expr e, string fn) =>
-        e is Num { Value.IsInteger: true } n ? n.Value.Num : throw new MathException($"{fn}: expected an integer.");
+        e is Num { Value.IsInteger: true } n ? n.Value.Num : throw new MathException(Messages.T("{0}: expected an integer.", fn));
 
     private static Expr Filled(Expr[] a, Expr value)
     {
         int m = Int(a[0], "Rows"), n = a.Length > 1 ? Int(a[1], "Columns") : m;
-        if (m < 1 || n < 1 || (long)m * n > 1_000_000) throw new MathException("Invalid matrix size.");
+        if (m < 1 || n < 1 || (long)m * n > 1_000_000) throw new MathException(Messages.T("Invalid matrix size."));
         return Expr.List(Enumerable.Range(0, m).Select(_ => Expr.List(Enumerable.Repeat(value, n))));
     }
 
@@ -595,7 +595,7 @@ public static class Builtins
 
     private static Expr Variance(List<Expr> l)
     {
-        if (l.Count < 2) throw new MathException("variance needs at least two values.");
+        if (l.Count < 2) throw new MathException(Messages.T("variance needs at least two values."));
         var mean = Expr.Plus(l) / l.Count;
         return Simplified(Expr.Plus(l.Select(x => Expr.Power(x - mean, 2))) / (l.Count - 1));
     }

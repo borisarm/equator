@@ -56,7 +56,7 @@ public static class BigEval
                     case "I": return new BigComplex(BigFloat.Zero(p), BigFloat.FromInteger(1, p));
                 }
                 if (vars is not null && vars.TryGetValue(s.Name, out var v)) return v;
-                throw new MathException($"Cannot evaluate '{s.Name}' numerically: it has no value.");
+                throw new MathException(Messages.T("Cannot evaluate '{0}' numerically: it has no value.", s.Name));
             case AddExpr a:
                 {
                     var sum = BigComplex.Real(BigFloat.Zero(p));
@@ -80,7 +80,7 @@ public static class BigEval
             case FnExpr f:
                 return Function(f.Name, f.Args.Select(a => Eval(a, p, vars)).ToArray(), p);
         }
-        throw new MathException($"Cannot evaluate {e} numerically.");
+        throw new MathException(Messages.T("Cannot evaluate {0} numerically.", e));
     }
 
     public static BigComplex IntPow(BigComplex b, int n, int p)
@@ -113,7 +113,7 @@ public static class BigEval
     public static BigComplex Log(BigComplex z, int p)
     {
         if (z.IsReal && z.Re.Sign > 0) return BigComplex.Real(BigMath.Log(z.Re, p));
-        if (z.Re.IsZero && z.Im.IsZero) throw new MathException("Logarithm of zero.");
+        if (z.Re.IsZero && z.Im.IsZero) throw new MathException(Messages.T("Logarithm of zero."));
         var modulus = z.Abs(p + 16);
         return new(BigMath.Log(modulus, p), BigMath.Atan2(z.Im, z.Re, p));
     }
@@ -139,7 +139,7 @@ public static class BigEval
         if (b.Re.IsZero && b.Im.IsZero)
         {
             if (e.IsReal && e.Re.Sign > 0) return BigComplex.Real(BigFloat.Zero(p));
-            throw new MathException("0 raised to a non-positive power.");
+            throw new MathException(Messages.T("0 raised to a non-positive power."));
         }
         if (e.IsReal && b.IsReal && b.Re.Sign > 0) return BigComplex.Real(BigMath.Pow(b.Re, e.Re, p));
         if (e.IsReal && e.Re.CompareTo(BigFloat.FromRational(BigRational.Half, p)) == 0) return Sqrt(b, p);
@@ -239,7 +239,7 @@ public static class BigEval
                 }
                 break;
         }
-        throw new MathException($"Cannot evaluate {name} to arbitrary precision for this argument.");
+        throw new MathException(Messages.T("Cannot evaluate {0} to arbitrary precision for this argument.", name));
     }
 
     private static BigComplex Half(int p) => BigComplex.Real(BigFloat.FromRational(BigRational.Half, p));
