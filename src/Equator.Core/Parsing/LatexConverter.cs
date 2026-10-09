@@ -3,7 +3,7 @@ using System.Text;
 namespace Equator.Core.Parsing;
 
 /// <summary>
-/// Translates LaTeX mathematics (as produced by handwriting recognition) into Equator input syntax.
+/// Translates LaTeX mathematics (as written by people or produced by other tools) into Equator input syntax.
 /// Rows of stacked environments (matrix, cases, aligned, ...) and implication arrows (⇒, ∴) start new
 /// lines, so the result is a list of lines. Separators between alternatives are written " or ", " and "
 /// or " , " at the top level of a line (see <see cref="Checking.WorkChecker"/>).

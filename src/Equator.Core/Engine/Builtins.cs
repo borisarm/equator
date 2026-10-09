@@ -198,7 +198,7 @@ public static class Builtins
         Add("check", CheckCategory, "check([\"step 1\", \"step 2\", ...])", "Checks a worked solution line by line: each step must follow from the previous one, and the final answer must solve the first line (an equation, system, inequality or expression to transform).",
             "check([\"2x + 3 = 7\", \"2x = 4\", \"x = 2\"])", 1, 1, (k, a) =>
                 new StrExpr(Checking.WorkChecker.Check(StepTexts(a[0], "check")).ToText()));
-        Add("checklatex", CheckCategory, "checklatex([\"step 1\", ...])", "Like check, with the steps written in LaTeX (as produced by handwriting recognition).",
+        Add("checklatex", CheckCategory, "checklatex([\"step 1\", ...])", "Like check, with the steps written in LaTeX.",
             "checklatex([\"x^2 - 5x + 6 = 0\", \"(x - 2)(x - 3) = 0\", \"x = 2 \\\\text{ or } x = 3\"])", 1, 1, (k, a) =>
                 new StrExpr(Checking.WorkChecker.Check(StepTexts(a[0], "checklatex").SelectMany(Parsing.LatexConverter.Convert).ToList()).ToText()));
 

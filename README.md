@@ -205,6 +205,7 @@ and expression transformations, one step per line, not proofs in prose.
 
 Unhandled UI errors are logged to `%TEMP%\Equator\equator.log`. For automated visual checks, set
 `EQUATOR_SNAPSHOT=<path.png>` (optionally `EQUATOR_SNAPSHOT_PAGES=n`, `EQUATOR_SNAPSHOT_DELAY=seconds`,
-`EQUATOR_THEME=dark|light` and `EQUATOR_LANG=<code>`, e.g. `ar`); the app then writes renders of its own window
-about seven seconds after start. Regenerate the icon with
+`EQUATOR_THEME=dark|light`, `EQUATOR_LANG=<code>` (e.g. `ar`), `EQUATOR_WINDOW_SIZE=WxH`, `EQUATOR_ZOOM=1.2` and
+`EQUATOR_SIDE_TAB=guide|variables`); the app then writes renders of its own window about seven seconds after
+start. `store/` holds the Microsoft Store listing texts, screenshots and submission notes. Regenerate the icon with
 `python tools/make_icon.py`.

@@ -33,7 +33,17 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Equator.ico"));
-        ResizeAndCenter(1440, 940);
+        // Diagnostics and Store screenshots: EQUATOR_WINDOW_SIZE=1942x1092, EQUATOR_ZOOM=1.2, EQUATOR_SIDE_TAB=guide.
+        if (Environment.GetEnvironmentVariable("EQUATOR_WINDOW_SIZE")?.Split('x') is [var sw, var sh]
+            && int.TryParse(sw, out var width) && int.TryParse(sh, out var height))
+            ResizeAndCenter(width, height);
+        else
+            ResizeAndCenter(1440, 940);
+        if (double.TryParse(Environment.GetEnvironmentVariable("EQUATOR_ZOOM"), CultureInfo.InvariantCulture, out var zoom))
+            _zoom = Math.Clamp(zoom, 0.6, 2.2);
+        if (Environment.GetEnvironmentVariable("EQUATOR_SIDE_TAB") is "guide" or "variables")
+            RootGrid.Loaded += (_, _) => SidePanelSelector.SelectedItem =
+                Environment.GetEnvironmentVariable("EQUATOR_SIDE_TAB") == "guide" ? GuideTab : VariablesTab;
 
         _host.Kernel.EnvironmentChanged += OnEnvironmentChanged;
         BuildSymbolPalette();
@@ -618,14 +628,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Language tag for the window. The text is translated, but numbers must look the way they are typed (7, not ٧
+    /// or ৭): the window mixes prose with maths and code everywhere. Chinese keeps its own tag so Han characters use
+    /// Simplified Chinese glyphs; the other scripts are shaped the same either way.
+    /// </summary>
+    private static string DisplayLanguage => Loc.Current == "zh-Hans" ? "zh-Hans" : "en-US";
+
     /// <summary>Applies the current language to everything built in code (XAML text follows by itself).</summary>
     private void ApplyLanguage()
     {
         RootGrid.FlowDirection = Loc.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        RootGrid.Language = Loc.Current;
-        // Cells hold maths: numbers there must look the way they are typed (7, not ٧), whatever the language.
-        // Chinese keeps its own tag so Han characters in comments use Simplified Chinese glyphs.
-        CellsPanel.Language = Loc.Current == "zh-Hans" ? "zh-Hans" : "en-US";
+        RootGrid.Language = DisplayLanguage;
         BuildFunctionList(FunctionSearch.Text.Trim());
         BuildGuide();
         RefreshVariables(_variables);

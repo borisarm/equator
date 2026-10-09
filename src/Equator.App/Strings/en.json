@@ -137,7 +137,7 @@
   "fn.dsolve": "Solves ordinary differential equations (separable, linear first order, linear constant-coefficient). Write derivatives as y', y''.",
   "fn.simplify": "Tries algebraic, rational and trigonometric transformations and returns the simplest form (optionally under extra assumptions).",
   "fn.check": "Checks a worked solution line by line: each step must follow from the previous one, and the final answer must solve the first line (an equation, system, inequality or expression to transform).",
-  "fn.checklatex": "Like check, with the steps written in LaTeX (as produced by handwriting recognition).",
+  "fn.checklatex": "Like check, with the steps written in LaTeX.",
   "fn.assume": "Declares assumptions about variables (inequalities with a number, or real, integer, positive, negative, nonnegative, nonpositive, nonzero, natural). They refine results from then on.",
   "fn.forget": "Removes assumptions about the given variables (all of them without arguments).",
   "fn.assumptions": "Lists the assumptions in effect.",
