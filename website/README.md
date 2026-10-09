@@ -47,7 +47,7 @@ app (Azure DNS, a few cents a month, or Cloudflare's free plan) and add `equator
 
 ## Updating
 
-- The Store link points to a Store search for "EquatorSolver"; once the app is published, replace it in
-  `index.html` and `es/index.html` with the app's page (`https://apps.microsoft.com/detail/<Store ID>`).
+- The download buttons in `index.html` and `es/index.html` link to the Store page of Store ID `9P7WTJNFC7J8`
+  (`https://apps.microsoft.com/detail/9P7WTJNFC7J8`).
 - Screenshots in `img/` are copies of `store/screenshots/en` and `store/screenshots/es`.
 - Change the "Last updated" date on both privacy pages whenever the policy changes.

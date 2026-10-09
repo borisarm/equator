@@ -1,5 +1,7 @@
 # Microsoft Store submission — EquatorSolver 1.0.0.0
 
+Store ID: `9P7WTJNFC7J8` — Store page https://apps.microsoft.com/detail/9P7WTJNFC7J8
+
 Everything Partner Center asks for, in the order its pages appear. The package is built from the `v1.0.0.0` tag
 with `.\tools\package.ps1` and lands in `AppPackages\Equator_1.0.0.0.msixupload` (not in git).
 
