@@ -40,6 +40,11 @@ az staticwebapp hostname set --name equatorsol-web --resource-group rg-equatorso
 GoDaddy cannot point the bare domain (`equatorsol.es`) at Azure with a CNAME or ALIAS record, so use GoDaddy's
 domain forwarding: `equatorsol.es` → `https://www.equatorsol.es`, permanent (301), without masking.
 
+Status (9 October 2026): `www.equatorsol.es` is connected and serves HTTPS with an Azure-managed certificate;
+`http://equatorsol.es` forwards to it. GoDaddy's forwarding does not answer HTTPS, so `https://equatorsol.es`
+does not load; always publish links with `www`. To fix it, host the DNS zone where the bare domain can alias the
+app (Azure DNS, a few cents a month, or Cloudflare's free plan) and add `equatorsol.es` as a second custom domain.
+
 ## Updating
 
 - The Store link points to a Store search for "EquatorSolver"; once the app is published, replace it in
