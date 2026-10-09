@@ -8,10 +8,10 @@ Your choice of markets, price and release date. Nothing in the app restricts any
 
 ## Properties
 - Category: **Education** (Productivity also fits).
-- Privacy policy: not required. The app declares no internet capability, needs no account and collects no data;
-  the only thing it stores is the interface language, locally in `%LOCALAPPDATA%\Equator\settings.json`. If
-  Partner Center asks anyway, publish the statement at the end of this file at a public URL (the GitHub repository
-  is private, so it cannot host it).
+- Privacy policy URL: `https://www.equatorsol.es/privacy` (served from `website/`; until the domain resolves,
+  `https://green-bay-06ae3f903.4.azurestaticapps.net/privacy`). Support contact: `support@equatorsol.es`, support
+  website `https://www.equatorsol.es/support`. The app declares no internet capability, needs no account and
+  collects no data; it only stores the interface language locally in `%LOCALAPPDATA%\Equator\settings.json`.
 - System requirements: Windows 10 version 2004 (build 19041) or later, x64 or ARM64. Keyboard recommended.
 
 ## Age ratings
@@ -63,8 +63,6 @@ Diagnostics section of the main README).
 > the Guide tab on the right inserts more examples with one click. The language can be changed from the "…"
 > menu → Language.
 
-## Privacy statement (only if a URL is requested)
+## Privacy policy
 
-> EquatorSolver does not collect, store or transmit personal data. It works without an internet connection and
-> without an account. Worksheets are saved only where you choose, and the app keeps one local setting (the
-> interface language) on your device. Contact: <your support address>.
+Published at `/privacy` and `/es/privacidad` on the website (`website/privacy.html`, `website/es/privacidad.html`).

@@ -1,0 +1,19 @@
+{
+  "trailingSlash": "auto",
+  "routes": [
+    { "route": "/privacidad", "redirect": "/es/privacidad", "statusCode": 301 },
+    { "route": "/soporte", "redirect": "/es/soporte", "statusCode": 301 },
+    { "route": "/es/privacy", "redirect": "/es/privacidad", "statusCode": 301 },
+    { "route": "/es/support", "redirect": "/es/soporte", "statusCode": 301 }
+  ],
+  "responseOverrides": {
+    "404": { "rewrite": "/404.html" }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'none'; frame-ancestors 'none'"
+  },
+  "mimeTypes": { ".json": "application/json" }
+}
