@@ -8,6 +8,14 @@ with `.\tools\package.ps1` and lands in `AppPackages\Equator_1.0.0.0.msixupload`
 ## Pricing and availability
 Your choice of markets, price and release date. Nothing in the app restricts any market.
 
+- **Base price**: a paid tier (not Free).
+- **Free trial**: **7 days**. The app reads its Store license (`src/Equator.App/Services/Licensing.cs`): during the
+  trial a banner shows the days left and a *Buy EquatorSolver* button (the Store purchase dialog); once the trial
+  expires, notebooks still open, edit and save, but cells no longer evaluate until the app is bought. Without the
+  trial setting, the app has no trial and simply runs as bought.
+- The trial and price take effect with the submission; the 1.0.0.0 package has no trial code, so publish a new
+  version (1.1.0.0 or later) together with the pricing change.
+
 ## Properties
 - Category: **Education** (Productivity also fits).
 - Privacy policy URL: `https://www.equatorsol.es/privacy` (served from `website/`; until the domain resolves,
@@ -60,7 +68,8 @@ Diagnostics section of the main README).
 
 **Notes for certification** (optional):
 
-> No account, sign-in or internet connection is needed. The app opens with an example worksheet that runs on
+> No account, sign-in or internet connection is needed. The app is paid with a 7-day free trial handled by the
+> Store license; during the trial a banner shows the days left. The app opens with an example worksheet that runs on
 > start. To test: type an expression such as integrate(x^2*sin(x), x) in the last cell and press Shift+Enter;
 > the Guide tab on the right inserts more examples with one click. The language can be changed from the "…"
 > menu → Language.

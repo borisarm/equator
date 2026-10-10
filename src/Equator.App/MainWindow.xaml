@@ -14,6 +14,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="44" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -96,7 +97,14 @@
             </CommandBar.SecondaryCommands>
         </CommandBar>
 
-        <Grid Grid.Row="2">
+        <!-- Store trial: days left, or trial ended (see Services/Licensing.cs) -->
+        <InfoBar x:Name="LicenseBar" Grid.Row="2" Margin="8,0,8,6" IsOpen="False">
+            <InfoBar.ActionButton>
+                <Button x:Name="BuyButton" l:Tr.Text="license.buy" Click="Buy_Click" Style="{StaticResource AccentButtonStyle}" />
+            </InfoBar.ActionButton>
+        </InfoBar>
+
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="340" />
@@ -153,7 +161,7 @@
         </Grid>
 
         <!-- Status bar -->
-        <Grid Grid.Row="3" Padding="14,5" Background="{ThemeResource LayerFillColorDefaultBrush}"
+        <Grid Grid.Row="4" Padding="14,5" Background="{ThemeResource LayerFillColorDefaultBrush}"
               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center" Fill="{ThemeResource SystemFillColorSuccessBrush}" />

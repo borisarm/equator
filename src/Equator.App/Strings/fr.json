@@ -218,5 +218,13 @@
   "fn.clearall": "Supprime toutes les variables, fonctions et l'historique.",
   "fn.if": "Évaluation conditionnelle (utile dans les définitions récursives).",
   "fn.help": "Décrit une commande ou liste toutes les commandes.",
-  "fn.vars": "Liste les variables et fonctions définies."
+  "fn.vars": "Liste les variables et fonctions définies.",
+  "license.buy": "Acheter EquatorSolver",
+  "license.trialDays": "Essai gratuit : encore {0} jours",
+  "license.trialLastDay": "Essai gratuit : dernier jour",
+  "license.trialBody": "Tout fonctionne pendant l’essai. Achetez l’application pour continuer à évaluer après sa fin.",
+  "license.endedTitle": "Votre essai gratuit est terminé",
+  "license.endedBody": "Vous pouvez toujours ouvrir, modifier et enregistrer des carnets. Achetez EquatorSolver pour évaluer à nouveau des cellules.",
+  "license.notNow": "Plus tard",
+  "license.thanks": "Merci d’avoir acheté EquatorSolver !"
 }

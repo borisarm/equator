@@ -218,5 +218,13 @@
   "fn.clearall": "移除所有变量、函数和历史记录。",
   "fn.if": "条件求值（在递归定义中很有用）。",
   "fn.help": "说明某个命令，或列出所有命令。",
-  "fn.vars": "列出已定义的变量和函数。"
+  "fn.vars": "列出已定义的变量和函数。",
+  "license.buy": "购买 EquatorSolver",
+  "license.trialDays": "免费试用：还剩 {0} 天",
+  "license.trialLastDay": "免费试用：最后一天",
+  "license.trialBody": "试用期间所有功能均可使用。购买本应用后，试用结束后仍可继续计算。",
+  "license.endedTitle": "免费试用已结束",
+  "license.endedBody": "你仍然可以打开、编辑和保存笔记本。购买 EquatorSolver 即可再次计算单元格。",
+  "license.notNow": "以后再说",
+  "license.thanks": "感谢购买 EquatorSolver！"
 }

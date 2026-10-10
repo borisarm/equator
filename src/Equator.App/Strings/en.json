@@ -218,5 +218,13 @@
   "fn.clearall": "Removes all variables, functions and history.",
   "fn.if": "Conditional evaluation (useful in recursive definitions).",
   "fn.help": "Describes a command, or lists all commands.",
-  "fn.vars": "Lists defined variables and functions."
+  "fn.vars": "Lists defined variables and functions.",
+  "license.buy": "Buy EquatorSolver",
+  "license.trialDays": "Free trial: {0} days left",
+  "license.trialLastDay": "Free trial: last day",
+  "license.trialBody": "Everything works during the trial. Buy the app to keep evaluating once it ends.",
+  "license.endedTitle": "Your free trial has ended",
+  "license.endedBody": "You can still open, edit and save notebooks. Buy EquatorSolver to evaluate cells again.",
+  "license.notNow": "Not now",
+  "license.thanks": "Thank you for buying EquatorSolver!"
 }

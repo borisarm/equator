@@ -207,5 +207,7 @@ Unhandled UI errors are logged to `%TEMP%\Equator\equator.log`. For automated vi
 `EQUATOR_SNAPSHOT=<path.png>` (optionally `EQUATOR_SNAPSHOT_PAGES=n`, `EQUATOR_SNAPSHOT_DELAY=seconds`,
 `EQUATOR_THEME=dark|light`, `EQUATOR_LANG=<code>` (e.g. `ar`), `EQUATOR_WINDOW_SIZE=WxH`, `EQUATOR_ZOOM=1.2` and
 `EQUATOR_SIDE_TAB=guide|variables`); the app then writes renders of its own window about seven seconds after
-start. `store/` holds the Microsoft Store listing texts, screenshots and submission notes. Regenerate the icon with
+start. The 7-day free trial comes from the Store license and only applies to Store installs; to see its banner and
+the trial-ended state in a development build, set `EQUATOR_LICENSE=trial:<days>` or `EQUATOR_LICENSE=expired`
+(*Buy* then simulates a purchase). `store/` holds the Microsoft Store listing texts, screenshots and submission notes. Regenerate the icon with
 `python tools/make_icon.py`.

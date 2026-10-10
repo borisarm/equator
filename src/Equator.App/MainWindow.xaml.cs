@@ -19,6 +19,8 @@ namespace Equator.App;
 public sealed partial class MainWindow : Window
 {
     private readonly KernelHost _host = new();
+    private readonly Licensing _license;
+    private readonly Task _licenseReady;
     private CellControl? _activeCell;
     private string? _filePath;
     private bool _dirty;
@@ -44,6 +46,12 @@ public sealed partial class MainWindow : Window
         if (Environment.GetEnvironmentVariable("EQUATOR_SIDE_TAB") is "guide" or "variables")
             RootGrid.Loaded += (_, _) => SidePanelSelector.SelectedItem =
                 Environment.GetEnvironmentVariable("EQUATOR_SIDE_TAB") == "guide" ? GuideTab : VariablesTab;
+
+        // Read the Store license before anything evaluates (EvaluateCellAsync waits for it).
+        _license = new Licensing(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        _license.Changed += (_, _) => DispatcherQueue.TryEnqueue(async () => await RefreshLicenseAsync());
+        _licenseReady = RefreshLicenseAsync();
+        LicenseBar.Closed += (_, _) => _licenseBarDismissed = true;
 
         _host.Kernel.EnvironmentChanged += OnEnvironmentChanged;
         BuildSymbolPalette();
@@ -186,7 +194,7 @@ public sealed partial class MainWindow : Window
             CellsPanel.Children.Add(CreateCell(""));
         _dirty = false;
         UpdateTitle();
-        if (evaluate) _ = EvaluateAllAsync();
+        if (evaluate) _ = EvaluateAllAsync(askToBuy: false);
         DispatcherQueue.TryEnqueue(() => ((CellControl)CellsPanel.Children[^1]).FocusInput());
     }
 
@@ -250,6 +258,8 @@ public sealed partial class MainWindow : Window
     {
         var text = cell.Text;
         if (string.IsNullOrWhiteSpace(text)) { cell.ClearOutputs(); return; }
+        await _licenseReady;
+        if (!_license.CanEvaluate) { await ShowTrialEndedAsync(); return; }
         cell.SetBusy(true);
         BeginRunning();
         try
@@ -266,8 +276,15 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task EvaluateAllAsync()
+    private async Task EvaluateAllAsync(bool askToBuy = true)
     {
+        await _licenseReady;
+        // After the trial, notebooks still open (inputs only); on load the banner explains why nothing ran.
+        if (!_license.CanEvaluate)
+        {
+            if (askToBuy) await ShowTrialEndedAsync();
+            return;
+        }
         foreach (var cell in Cells.ToList())
             await EvaluateCellAsync(cell);
     }
@@ -609,6 +626,81 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
     }
 
+    // ---- license (Store trial) -------------------------------------------------------------------------
+
+    private bool _licenseBarDismissed, _trialDialogOpen;
+
+    private async Task RefreshLicenseAsync()
+    {
+        await _license.RefreshAsync();
+        UpdateLicenseBar();
+    }
+
+    private void UpdateLicenseBar()
+    {
+        switch (_license.State)
+        {
+            case LicenseState.Trial:
+                LicenseBar.Severity = InfoBarSeverity.Informational;
+                LicenseBar.Title = _license.TrialDaysLeft == 1 ? Loc.Get("license.trialLastDay") : Loc.Format("license.trialDays", _license.TrialDaysLeft);
+                LicenseBar.Message = Loc.Get("license.trialBody");
+                LicenseBar.IsClosable = true;
+                LicenseBar.IsOpen = !_licenseBarDismissed;
+                break;
+            case LicenseState.Expired:
+                LicenseBar.Severity = InfoBarSeverity.Warning;
+                LicenseBar.Title = Loc.Get("license.endedTitle");
+                LicenseBar.Message = Loc.Get("license.endedBody");
+                LicenseBar.IsClosable = false;
+                LicenseBar.IsOpen = true;
+                break;
+            default:
+                LicenseBar.IsOpen = false;
+                break;
+        }
+    }
+
+    /// <summary>Shown when the user tries to evaluate after the trial: buy now, or keep reading.</summary>
+    private async Task ShowTrialEndedAsync()
+    {
+        if (_trialDialogOpen || Content.XamlRoot is null) return;
+        _trialDialogOpen = true;
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Content.XamlRoot,
+                FlowDirection = RootGrid.FlowDirection,
+                Title = Loc.Get("license.endedTitle"),
+                Content = new TextBlock { Text = Loc.Get("license.endedBody"), TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = Loc.Get("license.buy"),
+                CloseButtonText = Loc.Get("license.notNow"),
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary) await BuyAsync();
+        }
+        finally
+        {
+            _trialDialogOpen = false;
+        }
+    }
+
+    private async Task BuyAsync()
+    {
+        BuyButton.IsEnabled = false;
+        try
+        {
+            if (await _license.PurchaseAsync()) SetStatus(Loc.Get("license.thanks"));
+            UpdateLicenseBar();
+        }
+        finally
+        {
+            BuyButton.IsEnabled = true;
+        }
+    }
+
+    private async void Buy_Click(object sender, RoutedEventArgs e) => await BuyAsync();
+
     // ---- language ------------------------------------------------------------------------------------
 
     private void BuildLanguageMenu()
@@ -644,6 +736,7 @@ public sealed partial class MainWindow : Window
         BuildGuide();
         RefreshVariables(_variables);
         UpdateTitle();
+        UpdateLicenseBar();
         foreach (var cell in Cells) cell.Relocalize();
         if (_running == 0) StatusText.Text = Loc.Get("status.ready");
     }
