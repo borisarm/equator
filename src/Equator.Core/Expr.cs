@@ -856,7 +856,8 @@ public sealed class ListExpr : CompositeExpr
     internal override int Rank => 6;
     public override Expr WithArgs(IReadOnlyList<Expr> args) => new ListExpr(args.ToArray());
 
-    public bool IsMatrix => Items.Count > 0 && Items.All(i => i is ListExpr l && l.Items.Count == ((ListExpr)Items[0]).Items.Count && l.Items.Count > 0);
+    /// <summary>Rows of equal length whose entries are not lists themselves (a list of matrices is not a matrix).</summary>
+    public bool IsMatrix => Items.Count > 0 && Items.All(i => i is ListExpr l && l.Items.Count == ((ListExpr)Items[0]).Items.Count && l.Items.Count > 0 && l.Items.All(x => x is not ListExpr));
 }
 
 public sealed class EqExpr : CompositeExpr

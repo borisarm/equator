@@ -283,10 +283,44 @@ public static class LinearAlgebra
     /// <summary>Eigenvalues with multiplicity as a list (via roots of the characteristic polynomial).</summary>
     public static List<Expr> Eigenvalues(Expr a)
     {
+        var m = ToArray(a);
+        int n = m.GetLength(0);
+        // A triangular matrix has its eigenvalues on the diagonal, symbolic entries included.
+        if (n == m.GetLength(1) && (IsTriangular(m, upper: true) || IsTriangular(m, upper: false)))
+            return Enumerable.Range(0, n).Select(i => m[i, i]).OrderBy(v => v).ToList();
         var lambda = new Sym("\u0001lambda");
         var cp = CharacteristicPolynomial(a, lambda);
-        var roots = Solver.PolynomialRoots(cp, lambda, withMultiplicity: true);
+        var roots = m.Cast<Expr>().All(x => x.IsNumber) ? Solver.PolynomialRoots(cp, lambda, withMultiplicity: true) : SymbolicRoots(cp, lambda);
         if (roots is null) throw new MathException(Messages.T("Could not compute the eigenvalues."));
+        return roots;
+    }
+
+    private static bool IsTriangular(Expr[,] m, bool upper)
+    {
+        int n = m.GetLength(0);
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if ((upper ? i > j : i < j) && !IsZeroEntry(m[i, j])) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Roots with multiplicity of a polynomial with symbolic coefficients: factoring first keeps repeated roots
+    /// and splits off rational factors (λ − a)(λ − b) that the quadratic formula would write with √((a − b)²).
+    /// </summary>
+    private static List<Expr>? SymbolicRoots(Expr cp, Sym lambda)
+    {
+        var factored = Factoring.Factor(cp);
+        var factors = factored is MulExpr mul ? mul.Factors : [factored];
+        var roots = new List<Expr>();
+        foreach (var f in factors)
+        {
+            var (b, e) = f is PowExpr { Exponent: Num { Value.IsInteger: true } k } p ? (p.Base, (int)k.Value.Num) : (f, 1);
+            if (b.FreeOf(lambda)) continue;
+            var r = Solver.PolynomialRoots(b, lambda, withMultiplicity: true);
+            if (r is null) return null;
+            for (int i = 0; i < e; i++) roots.AddRange(r);
+        }
         return roots;
     }
 
