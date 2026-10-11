@@ -58,6 +58,7 @@ public static class WorkChecker
 
     public static WorkReport Check(IReadOnlyList<string> lines)
     {
+        if (RowReduction.TryCheck(lines) is { } rowReduction) return rowReduction;
         var kernel = new Kernel();
         var steps = new List<StepResult>();
         var statements = new List<(int Index, Statement S)>();
@@ -669,7 +670,7 @@ public static class WorkChecker
         return null;
     }
 
-    private static WorkReport Finish(List<StepResult> steps, string summary, bool finalWrong = false)
+    internal static WorkReport Finish(List<StepResult> steps, string summary, bool finalWrong = false)
     {
         steps.Sort((a, b) => a.Index.CompareTo(b.Index));
         var overall = steps.Any(s => s.Verdict == Verdict.Incorrect) || finalWrong

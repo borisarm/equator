@@ -33,6 +33,8 @@ public static class Builtins
         ["roots"] = "solve", ["partialfractions"] = "apart", ["parfrac"] = "apart", ["length"] = "len", ["size"] = "dims",
         ["fib"] = "fibonacci", ["arg"] = "arg", ["sgn"] = "sign", ["conjugate"] = "conj", ["ifactor"] = "factorint",
         ["primefactors"] = "factorint", ["odesolve"] = "dsolve", ["avg"] = "mean", ["std"] = "stdev",
+        ["kernel"] = "nullspace", ["colspace"] = "columnspace", ["image"] = "columnspace", ["adj"] = "adjugate",
+        ["minimalpoly"] = "minpoly", ["pseudoinverse"] = "pinv", ["leastsquares"] = "lsq", ["projection"] = "proj",
         ["linspace"] = "range", ["seq"] = "table", ["nIntegrate"] = "nintegrate", ["quad"] = "nintegrate",
         ["?"] = "help",
     };
@@ -422,6 +424,38 @@ public static class Builtins
         Add("norm", LinAlg, "norm(v)", "Euclidean norm of a vector (Frobenius norm of a matrix).", "norm([3, 4])", 1, 1, (k, a) =>
             Simplified(Expr.Sqrt(Expr.Plus(Flatten(a[0]).Select(x => x.IsNumber || x.IsConstant && !x.Contains(Expr.I) ? Expr.Power(x, 2) : Expr.Power(Expr.Call("abs", x), 2))))));
         Add("linsolve", LinAlg, "linsolve(A, b)", "Solves the linear system A·x = b.", "linsolve([[2, 1], [1, 3]], [3, 5])", 2, 2, (k, a) => LinearAlgebra.LinSolve(a[0], a[1]));
+        Add("lu", LinAlg, "lu(A)", "LU factorisation: [L, U, P] with P·A = L·U (L unit lower triangular, U upper triangular, P a permutation).",
+            "lu([[2, 1, 1], [4, 3, 3], [8, 7, 9]])", 1, 1, (k, a) => Decompositions.Lu(a[0]));
+        Add("qr", LinAlg, "qr(A)", "QR factorisation: [Q, R] with A = Q·R (Q with orthonormal columns, R upper triangular).",
+            "qr([[3, 1], [4, 2]])", 1, 1, (k, a) => Decompositions.Qr(a[0]));
+        Add("cholesky", LinAlg, "cholesky(A)", "Cholesky factor of a symmetric positive definite matrix: L with A = L·Lᵀ.",
+            "cholesky([[4, 2], [2, 3]])", 1, 1, (k, a) => Decompositions.Cholesky(a[0]));
+        Add("svd", LinAlg, "svd(A)", "Singular value decomposition: [U, Σ, V] with A = U·Σ·Vᵀ.",
+            "svd([[3, 2, 2], [2, 3, -2]])", 1, 1, (k, a) => Decompositions.Svd(a[0]));
+        Add("singularvalues", LinAlg, "singularvalues(A)", "Singular values, largest first.",
+            "singularvalues([[3, 0], [4, 5]])", 1, 1, (k, a) => Expr.List(Decompositions.SingularValues(a[0])));
+        Add("cond", LinAlg, "cond(A)", "Condition number σ_max/σ_min (2-norm).", "cond([[1, 2], [3, 4]])", 1, 1, (k, a) => Decompositions.Condition(a[0]));
+        Add("gramschmidt", LinAlg, "gramschmidt([v1, v2, ...])  ·  gramschmidt([v1, v2, ...], False)",
+            "Orthonormal basis of the span of the vectors (Gram–Schmidt); with False, orthogonal but not normalised.",
+            "gramschmidt([[1, 1, 0], [1, 0, 1]])", 1, 2, (k, a) =>
+                Expr.List(Decompositions.GramSchmidt(Items(a[0], "gramschmidt").Select(v => Items(v, "gramschmidt").ToArray()).ToList(),
+                    normalize: a.Length < 2 || !(a[1].IsZero || a[1] is Sym { Name: "False" })).Select(v => Expr.List(v))));
+        Add("columnspace", LinAlg, "columnspace(A)", "Basis of the column space (the pivot columns).", "columnspace([[1, 2, 3], [2, 4, 7]])", 1, 1, (k, a) =>
+            Expr.List(Decompositions.ColumnSpace(a[0])));
+        Add("rowspace", LinAlg, "rowspace(A)", "Basis of the row space (non-zero rows of the reduced row echelon form).", "rowspace([[1, 2, 3], [2, 4, 7]])", 1, 1, (k, a) =>
+            Expr.List(Decompositions.RowSpace(a[0])));
+        Add("proj", LinAlg, "proj(u, v)", "Orthogonal projection of u onto v.", "proj([1, 2, 3], [1, 1, 0])", 2, 2, (k, a) => Decompositions.Projection(a[0], a[1]));
+        Add("pinv", LinAlg, "pinv(A)", "Moore–Penrose pseudo-inverse.", "pinv([[1, 2], [2, 4], [3, 6]])", 1, 1, (k, a) => Decompositions.PseudoInverse(a[0]));
+        Add("lsq", LinAlg, "lsq(A, b)", "Least-squares solution of A·x = b (the shortest one when there are many).",
+            "lsq([[1, 0], [1, 1], [1, 2]], [6, 0, 0])", 2, 2, (k, a) => Decompositions.LeastSquares(a[0], a[1]));
+        Add("diagonalize", LinAlg, "diagonalize(A)", "[P, D] with A = P·D·P⁻¹ and D diagonal.", "diagonalize([[4, 1], [2, 3]])", 1, 1, (k, a) => Decompositions.Diagonalize(a[0]));
+        Add("jordan", LinAlg, "jordan(A)", "Jordan normal form: [P, J] with A = P·J·P⁻¹.", "jordan([[5, 4, 2, 1], [0, 1, -1, -1], [-1, -1, 3, 0], [1, 1, -1, 2]])", 1, 1, (k, a) =>
+            Decompositions.Jordan(a[0]));
+        Add("minpoly", LinAlg, "minpoly(A, x)", "Minimal polynomial: the monic polynomial of least degree with p(A) = 0.", "minpoly([[2, 0, 0], [0, 2, 0], [0, 0, 3]], x)", 1, 2, (k, a) =>
+            Decompositions.MinimalPolynomial(a[0], a.Length > 1 ? Var(a[1], "minpoly") : new Sym("x")), 1);
+        Add("expm", LinAlg, "expm(A)  ·  expm(A, t)", "Matrix exponential exp(A), or exp(A·t); x(t) = exp(A·t)·x₀ solves x' = A·x.",
+            "expm([[0, 1], [-1, 0]], t)", 1, 2, (k, a) => Decompositions.Exponential(a[0], a.Length > 1 ? a[1] : Expr.One), 1);
+        Add("adjugate", LinAlg, "adjugate(A)", "Adjugate (classical adjoint): A·adjugate(A) = det(A)·I.", "adjugate([[1, 2], [3, 4]])", 1, 1, (k, a) => Decompositions.Adjugate(a[0]));
 
         // Lists & statistics
         AddLazy("table", Lists, "table(expr, i, a, b)  ·  table(expr, i, a, b, step)", "List of expr for i from a to b.", "table(i^2, i, 1, 10)", 4, 5, (k, raw) =>

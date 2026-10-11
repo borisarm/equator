@@ -151,6 +151,82 @@ public class WorkCheckerTests
         Assert.Equal(Verdict.Incorrect, Check("x^2 < 9", "x < 3").Overall);
     }
 
+    // ---- row reduction ----------------------------------------------------------------------------------
+
+    [Fact]
+    public void RowReductionWithoutNamedOperationsIsRecognised()
+    {
+        var r = Check("[[1, 2, 3], [3, 4, 5]]", "[[1, 2, 3], [0, -2, -4]]", "[[1, 2, 3], [0, 1, 2]]", "[[1, 0, -1], [0, 1, 2]]");
+        AssertVerdicts(r, Verdict.Given, Verdict.Correct, Verdict.Correct, Verdict.Correct);
+        Assert.Equal("R2 → R2 - 3R1", r.Steps[1].Message);
+        Assert.Equal("R2 → -(1/2)R2", r.Steps[2].Message);
+        Assert.Equal("R1 → R1 - 2R2", r.Steps[3].Message);
+        Assert.Contains("reduced row echelon form", r.Summary);
+        Assert.Equal("R1 ↔ R2", Check("[[0, 1, 2], [1, 1, 1]]", "[[1, 1, 1], [0, 1, 2]]").Steps[1].Message);
+    }
+
+    [Fact]
+    public void ArithmeticSlipInARowIsFoundWithTheIntendedOperation()
+    {
+        var r = Check("[[1, 2, 3], [3, 4, 5]]", "[[1, 2, 3], [0, -2, -6]]", "[[1, 2, 3], [0, 1, 3]]");
+        AssertVerdicts(r, Verdict.Given, Verdict.Incorrect, Verdict.Correct);
+        Assert.Contains("row 2", r.Steps[1].Message);
+        Assert.Contains("R2 → R2 - 3R1 would give [0, -2, -4]", r.Steps[1].Message);
+        Assert.Contains("[[1, 0, -1], [0, 1, 2]]", r.Summary);
+        Assert.Equal(Verdict.Incorrect, r.Overall);
+    }
+
+    [Fact]
+    public void NamedOperationsAreAppliedAndCompared()
+    {
+        AssertVerdicts(Check("[[1, 2, 3], [3, 4, 5]]", "R2 → R2 - 3R1: [[1, 2, 3], [0, -2, -4]]", "R2 -> (-1/2)R2: [[1, 2, 3], [0, 1, 2]]"),
+            Verdict.Given, Verdict.Correct, Verdict.Correct);
+        // Textbook order (-2R1 + R2 → R2), Spanish row names, = as the arrow, several operations at once.
+        AssertVerdicts(Check("[[1, 1, 2], [2, 3, 5], [1, 0, 4]]", "-2R1 + R2 → R2, F3 = F3 - F1: [[1, 1, 2], [0, 1, 1], [0, -1, 2]]",
+            "R3 → R3 + R2: [[1, 1, 2], [0, 1, 1], [0, 0, 3]]"), Verdict.Given, Verdict.Correct, Verdict.Correct);
+        AssertVerdicts(Check("[[1, 2], [3, 4]]", "R1 ↔ R2: [[3, 4], [1, 2]]"), Verdict.Given, Verdict.Correct);
+        var wrong = Check("[[1, 2, 3], [3, 4, 5]]", "R2 → R2 - 3R1: [[1, 2, 3], [0, -2, -6]]");
+        Assert.Equal(Verdict.Incorrect, wrong.Steps[1].Verdict);
+        Assert.Contains("row 2 should be [0, -2, -4]", wrong.Steps[1].Message);
+        // The matrix is right, but not for the operation written.
+        var mislabelled = Check("[[1, 2], [3, 4]]", "R2 → R2 - 2R1: [[1, 2], [0, -2]]");
+        Assert.Equal(Verdict.Incorrect, mislabelled.Steps[1].Verdict);
+        Assert.Contains("still row-equivalent", mislabelled.Steps[1].Message);
+    }
+
+    [Fact]
+    public void AugmentedMatricesWithBars()
+    {
+        var r = Check("[[2, 1, -1 | 8], [-3, -1, 2 | -11], [-2, 1, 2 | -3]]",
+            "R2 → R2 + (3/2)R1, R3 → R3 + R1: [[2, 1, -1 | 8], [0, 1/2, 1/2 | 1], [0, 2, 1 | 5]]",
+            "R3 → R3 - 4R2: [[2, 1, -1 | 8], [0, 1/2, 1/2 | 1], [0, 0, -1 | 1]]");
+        AssertVerdicts(r, Verdict.Given, Verdict.Correct, Verdict.Correct);
+        Assert.Contains("row echelon form, but not yet reduced", r.Summary);
+    }
+
+    [Fact]
+    public void InvalidRowOperations()
+    {
+        var zero = Check("[[1, 2], [3, 4]]", "R2 → 0R2: [[1, 2], [0, 0]]");
+        Assert.Equal(Verdict.Incorrect, zero.Steps[1].Verdict);
+        Assert.Contains("cannot be undone", zero.Steps[1].Message);
+        var lost = Check("[[1, 2], [3, 4]]", "[[1, 2], [1, 2]]");
+        Assert.Equal(Verdict.Incorrect, lost.Steps[1].Verdict);
+        Assert.Contains("rank changed from 2 to 1", lost.Steps[1].Message);
+        Assert.Contains("different size", Check("[[1, 2], [3, 4]]", "[[1, 2, 3], [3, 4, 5]]").Steps[1].Message);
+        // An unreadable operation still lets the matrix be checked.
+        var unreadable = Check("[[1, 2], [3, 4]]", "swap them: [[3, 4], [1, 2]]");
+        Assert.Equal(Verdict.Correct, unreadable.Steps[1].Verdict);
+        Assert.Contains("Could not read the row operation", unreadable.Steps[1].Message);
+    }
+
+    [Fact]
+    public void SymbolicEntries()
+    {
+        AssertVerdicts(Check("[[a, 1], [1, a]]", "R2 → a R2 - R1: [[a, 1], [0, a^2 - 1]]"), Verdict.Given, Verdict.Correct);
+        Assert.Equal(Verdict.Incorrect, Check("[[a, 1], [1, a]]", "R2 → a R2 - R1: [[a, 1], [0, a^2 + 1]]").Steps[1].Verdict);
+    }
+
     // ---- input handling -------------------------------------------------------------------------------
 
     [Fact]
