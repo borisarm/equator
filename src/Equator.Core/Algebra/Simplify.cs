@@ -57,6 +57,14 @@ public static class Simplifier
             if (denested is not null && denested != e) { yield return denested; e = denested; }
             var rationalized = Safe(() => RationalizeDenominator(e));
             if (rationalized is not null) yield return rationalized;
+            var combined = Safe(() => CombineRadicals(e));
+            if (combined is not null && combined != e) { yield return combined; e = combined; }
+        }
+
+        if (e.Contains(Expr.I))
+        {
+            var normal = Safe(() => RationalizeComplex(e));
+            if (normal is not null) yield return normal;
         }
 
         var expanded = Safe(() => Expansion.Expand(e));
@@ -129,6 +137,60 @@ public static class Simplifier
         var newDen = Expansion.Expand(d * conjugate);
         if (!newDen.IsNumber || newDen.IsZero) return null;
         return Expansion.Expand(n * conjugate) / newDen;
+    }
+
+    /// <summary>
+    /// n / d with i in d → n·conj(d) / (d·conj(d)), so (2 + i)/(3 − 4i) becomes 2/25 + 11/25 i. Only when the new
+    /// denominator is free of i (conjugating i ↦ −i is the complex conjugate when the other symbols are real).
+    /// </summary>
+    private static Expr? RationalizeComplex(Expr e)
+    {
+        var (n, d) = Rational.NumDen(e);
+        if (!d.Contains(Expr.I)) return null;
+        var conjugate = d.Substitute(Expr.I, -Expr.I);
+        var newDen = Expansion.Expand(d * conjugate);
+        if (newDen.Contains(Expr.I) || newDen.IsZero) return null;
+        return Expansion.Expand(Expansion.Expand(n * conjugate) / newDen);
+    }
+
+    /// <summary>
+    /// Products of roots of positive rationals with the same index become one root, reduced: 3^(2/3)·6^(1/3) =
+    /// 54^(1/3) = 3·2^(1/3), and 125^(1/4)·5^(-1/4) = 25^(1/4) = √5.
+    /// </summary>
+    private static Expr CombineRadicals(Expr e) => e.MapBottomUp(z =>
+    {
+        if (z is PowExpr { Base: Num { Value.Sign: > 0 } b, Exponent: Num { Value: var q } } single && !q.IsInteger)
+            return Root(BigRational.Pow(b.Value, (int)q.Num), q.Den);
+        if (z is not MulExpr m) return z;
+        var groups = m.Factors
+            .Where(f => f is PowExpr { Base: Num { Value.Sign: > 0 }, Exponent: Num { Value.IsInteger: false } })
+            .Cast<PowExpr>()
+            .GroupBy(p => ((Num)p.Exponent).Value.Den)
+            .Where(g => g.Count() > 1)
+            .ToList();
+        if (groups.Count == 0) return z;
+        var merged = groups.SelectMany(g => g).ToHashSet();
+        var factors = m.Factors.Where(f => f is not PowExpr p || !merged.Contains(p)).ToList();
+        foreach (var g in groups)
+        {
+            var value = g.Aggregate(BigRational.One, (acc, p) => acc * BigRational.Pow(((Num)p.Base).Value, (int)((Num)p.Exponent).Value.Num));
+            factors.Add(Root(value, g.Key));
+        }
+        return Expr.Times(factors);
+    });
+
+    /// <summary>value^(1/q) with the index lowered when value is a perfect power (25^(1/4) = 5^(1/2)).</summary>
+    private static Expr Root(BigRational value, System.Numerics.BigInteger q)
+    {
+        if (q > 64) return Expr.Power(new Num(value), new Num(new BigRational(1, q)));
+        int index = (int)q;
+        for (int k = index; k >= 2; k--)
+        {
+            if (index % k != 0) continue;
+            if (IntMath.TryExactRoot(value.Num, k, out var rn) && IntMath.TryExactRoot(value.Den, k, out var rd))
+                return Expr.Power(new Num(new BigRational(rn, rd)), new Num(new BigRational(1, index / k)));
+        }
+        return Expr.Power(new Num(value), new Num(new BigRational(1, index)));
     }
 
     private static bool IsTrig(Expr e) => e is FnExpr { Name: "sin" or "cos" or "tan" or "cot" or "sec" or "csc" or "sinh" or "cosh" or "tanh" };

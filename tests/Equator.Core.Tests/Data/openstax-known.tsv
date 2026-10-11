@@ -1,0 +1,46 @@
+# Exercises of openstax.tsv the engine does not handle yet, or whose book answer cannot be used: id, reason.
+# A listed exercise that starts passing fails the test, so this list stays accurate. Regenerate the failures with
+# EQUATOR_CORPUS_REPORT=<file> dotnet test --filter OpenStaxCorpusTests.Report.
+
+# Odd roots of negative numbers: Equator's x^(1/3) and root(x, 3) are principal (complex) roots; the books use real roots.
+IA/fs-id1167829745221	real cube roots: x = -64/27 needs (-64/27)^(1/3) = -4/3
+IA/fs-id1167836492727	real cube roots: x = -1, -512
+IA/fs-id1167836756609	real cube roots: x = -216
+IA/fs-id1169144452942	real cube roots: (8x + 5)^(1/3) = -3
+IA/fs-id1169148871204	real cube roots: root(4x + 5, 3) = -3
+IA/fs-id1169148879788	real cube roots: y = -27
+IA/fs-id1169148884439	real cube roots: root(2x, 3) = -2
+CA/fs-id1167339437693	real cube roots: root(-16z^3, 3) = -2z*root(2, 3)
+
+# Trigonometric identities simplify does not apply.
+AT/fs-id1223240	simplify prefers cos(x)/sin(x) to cot(x)
+AT/fs-id1359485	tangent subtraction formula in reverse
+AT/fs-id2478607	tangent addition formula in reverse
+AT/fs-id1359729	sum-to-product: sin 3x - sin x = 2 cos 2x sin x
+AT/fs-id1871513	sum-to-product on numerator and denominator
+
+# Trigonometric equations of a multiple angle: the books list every solution in [0, 2π); solve gives one period of the argument.
+AT/fs-id1794563	2 sin 3θ = 1: six solutions in [0, 2π)
+AT/fs-id1860552	2 cos 3θ = -√2: six solutions in [0, 2π)
+AT/fs-id2271373	2 sin πθ = 1: solutions up to 37/6
+
+# The exercise cannot be stated in Equator's terms.
+CA/fs-id1165133210727	the book uses E as a parameter; in Equator E is Euler's number
+CA/fs-id1726737	sqrt(|x|^2) = x holds for all x ≥ 0; solve reports that it holds on whole intervals
+CA/fs-id2700083	the instruction names the unknown (solve for y), which the corpus does not record
+
+# The book's answer disagrees with the problem (checked against the CNXML source).
+EA/fs-id1166502102930	book: (-6 ± √42)/4; the roots are (-6 ± √42)/2
+IA/fs-id1169149003467	book: 3/2 ± i/2; the roots are -3/2 ± i/2
+AT/fs-id2633020	book: 2 sin(π/2); 2 sin(π/4) cos(π/4) = sin(π/2) = 1
+EA/fs-id1169597540823	book: 25y^2 + 20x + 16 (x for y)
+EA/fs-id1169596658470	book: 3p√102/(17q^2); the quotient is 6p/q^2
+EA/fs-id1169595173828	book: (q - 3)/(q - 5); the difference is (q - 3)/(q + 5)
+EA/fs-id1169597700664	book: 243x^0/(32y^10); the power is 243x^20/(32y^10)
+IA/fs-id1167833181223	the answer carries a side condition the corpus cannot state
+
+# The book's MathML could not be converted faithfully.
+EA/fs-id1169594103499	the square in the answer is attached to the wrong group
+EA/fs-id1169596216275	the square in the answer is attached to the wrong group
+EA/fs-id1169596383194	an exponent in the answer is empty
+IA/fs-id1169145548241	an exponent in the answer is empty

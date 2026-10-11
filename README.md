@@ -43,7 +43,11 @@ the front end is WinUI 3 with Win2D typesetting and plotting.
 - ODEs: separable and linear first-order equations, linear constant-coefficient equations of any order
   (variation of parameters for the forcing term), initial conditions.
 - Linear algebra: exact determinants, inverses, RREF, rank, null space, eigenvalues/eigenvectors,
-  characteristic polynomial, linear systems; MATLAB-style `*` for matrix products and `A^n`.
+  characteristic polynomial, linear systems; MATLAB-style `*` for matrix products and `A^n`. Factorisations
+  `lu`, `qr`, `cholesky`, `svd` (exact when the eigenvalues of AᵀA are, numerical otherwise), `singularvalues`,
+  `cond`; `diagonalize`, `jordan` (Jordan chains from the kernels of (A − λI)^k), `minpoly`, `expm(A, t)` (from
+  the Jordan form, with sines and cosines for real matrices); `gramschmidt`, `columnspace`, `rowspace`, `proj`,
+  `pinv` (from a rank factorisation) and `lsq`, `adjugate`.
 - Number theory and statistics: factorisation (Pollard's ρ), primality (Miller–Rabin), gcd/lcm, binomials,
   ζ, mean/median/variance.
 - Output as typeset math, linear text (re-parseable) and LaTeX.
@@ -73,6 +77,11 @@ the front end is WinUI 3 with Win2D typesetting and plotting.
   - an inequality: the solution sets must agree (e.g. forgetting to flip the sign is caught);
   - an expression, derivative, integral or limit: each line must be equal to the previous one (integrals
     up to a constant of integration), with a concrete counterexample when it is not.
+  - a matrix: Gaussian elimination by hand. Each matrix must be row-equivalent to the previous one; a line may
+    name its operations before a colon (`"R2 → R2 - 3R1, R3 → R3 + R1: [[...]]"`, also `-3R1 + R2 → R2`,
+    `R1 ↔ R2`, `F`/`L` row names, `|` in augmented matrices), which are then applied and compared entry by entry.
+    Unnamed operations are recognised and described; a wrong row is reported with the operation it was probably
+    meant to be, and the summary says whether the result is in (reduced) row echelon form.
 - Later steps are checked against the previous line, and the final answer against the correct solution.
   `checklatex([...])` takes the steps in LaTeX.
 
@@ -91,7 +100,14 @@ definite integrals against quadrature, antiderivatives by differentiation, `solv
 series by their truncation order, inequalities by direct evaluation, random factorisations by re-expansion
 and irreducibility, arbitrary-precision values against reference digits and machine evaluation, and
 refinements under random assumptions by evaluation at points satisfying them. Seeded random expressions
-fuzz `expand`, `together`, `cancel`, `factor`, `simplify` and `diff`.
+fuzz `expand`, `together`, `cancel`, `factor`, `simplify` and `diff`. Matrix factorisations are checked by
+their defining properties (the factors multiply back, Q and U are orthogonal, the Penrose conditions hold).
+
+`tests/Equator.Core.Tests/Data/openstax.tsv` holds about 2,500 exercises with the books' own answers from the
+OpenStax algebra textbooks (CC BY 4.0), converted from their CNXML sources by `tools/openstax_corpus.py`:
+equations, inequalities and systems are solved, polynomials factored and expressions simplified, and each
+result is compared with the book's answer (solution sets numerically, factorisations by factor count,
+simplifications by value and size). `openstax-known.tsv` lists the exceptions with their reasons.
 
 By default the app builds unpackaged and self-contained, so it runs from the build folder with no installer:
 

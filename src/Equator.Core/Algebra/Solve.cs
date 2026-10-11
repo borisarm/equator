@@ -274,6 +274,34 @@ public static class Solver
             candidates.AddRange(sols);
         }
 
+        // Trigonometric functions of different angles (cos 2t = sin t, cos 2x cos x + sin 2x sin x = 1): rewrite
+        // with the identities, or in terms of the single angle, and solve that; the original equation still
+        // verifies every candidate below.
+        if (!solvedAll && f.ContainsAny(z => z is FnExpr { Name: "sin" or "cos" or "tan" or "cot" or "sec" or "csc" } t && !t.Args[0].FreeOf(x)))
+        {
+            foreach (var rewrite in new Func<Expr, Expr>[] { Simplifier.TrigSimplify, g => SingleAngle(g, x) ?? g, Simplifier.ExpandAngles })
+            {
+                Expr g;
+                try { g = rewrite(f); }
+                catch (MathException) { continue; }
+                if (g == f || g.FreeOf(x)) continue;
+                var (gn, _) = Rational.NumDen(Rational.Together(g));
+                var found = new List<Expr>();
+                bool all = true;
+                foreach (var factor in FactorsOf(gn))
+                {
+                    if (factor.FreeOf(x)) continue;
+                    var sols = SolveFactor(factor, x);
+                    if (sols is null) { all = false; break; }
+                    found.AddRange(sols);
+                }
+                if (!all) continue;
+                candidates = found;
+                solvedAll = true;
+                break;
+            }
+        }
+
         if (!solvedAll)
         {
             // A scan finds roots but cannot prove there are no others, so this stays flagged as numeric
@@ -469,6 +497,39 @@ public static class Solver
         return result;
     }
 
+    /// <summary>
+    /// When every trigonometric argument is an integer multiple n·u of one angle u (n ≤ 8), rewrites sin(n·u),
+    /// cos(n·u) and tan(n·u) in terms of sin u and cos u by the addition formulas: cos 2t = sin t becomes
+    /// cos²t − sin²t = sin t, which the single-angle methods solve. Null when the angles are not commensurable.
+    /// </summary>
+    private static Expr? SingleAngle(Expr f, Expr x)
+    {
+        var trig = f.Subexpressions().OfType<FnExpr>()
+            .Where(t => t.Name is "sin" or "cos" or "tan" && !t.Args[0].FreeOf(x)).ToList();
+        if (trig.Count == 0) return null;
+        var first = trig[0].Args[0];
+        var ratios = new List<BigRational>();
+        foreach (var t in trig)
+        {
+            if (Simplifier.Simplify(t.Args[0] / first) is not Num { Value: var r } || r.Sign <= 0) return null;
+            ratios.Add(r);
+        }
+        // The base angle is first·g with g the gcd of the ratios, so that every angle is an integer multiple of it.
+        var g = ratios.Aggregate((a, b) => new BigRational(System.Numerics.BigInteger.GreatestCommonDivisor(a.Num * b.Den, b.Num * a.Den), a.Den * b.Den));
+        var u = Expansion.Expand(first * new Num(g));
+        if (ratios.All(r => r == g)) return null;
+        var map = new Dictionary<Expr, Expr>();
+        foreach (var (t, r) in trig.Zip(ratios))
+        {
+            var n = r / g;
+            if (!n.IsInteger || n.Num > 8) return null;
+            Expr s = Expr.Call("sin", u), c = Expr.Call("cos", u), sn = s, cn = c;
+            for (int k = 1; k < (int)n.Num; k++) (sn, cn) = (sn * c + cn * s, cn * c - sn * s);
+            map[t] = t.Name switch { "sin" => sn, "cos" => cn, _ => sn / cn };
+        }
+        return f.Substitute(map);
+    }
+
     private static bool IsRealConstant(Expr e)
     {
         if (!e.IsConstant || e.IsUndefinedOrInfinite) return false;
@@ -662,6 +723,16 @@ public static class Solver
             throw new MathException(Messages.T("Cannot solve this equation symbolically, and it contains other symbols so it cannot be solved numerically."));
         var fn = NumericEval.Compile1(f, ((Sym)x).Name);
         var roots = NumericMethods.RealRoots(fn, a, b, 20000);
+        // Zero between several pairs of neighbouring roots: the equation holds on a whole interval
+        // (sqrt(x^2) = x for x ≥ 0), and listing sample points would mislead.
+        int flat = 0;
+        for (int i = 0; i + 1 < roots.Count && flat < 3; i++)
+        {
+            double m = (roots[i] + roots[i + 1]) / 2, v = fn(m);
+            if (double.IsFinite(v) && Math.Abs(v) < 1e-12 * (1 + Math.Abs(m))) flat++;
+        }
+        if (flat >= 3)
+            throw new MathException(Messages.T("The equation holds on whole intervals of {0}, not at isolated points; solve it as an inequality or with assumptions.", x));
         return roots.Select(r => (Expr)new Real(r)).ToList();
     }
 
@@ -685,6 +756,12 @@ public static class Solver
         else vars = variables is ListExpr vl ? vl.Items.ToList() : [variables];
 
         if (vars.Any(v => v is not Sym)) throw new MathException(Messages.T("Solve variables must be symbols."));
+
+        // A relation the kernel already decided (|x + 9| ≥ -6 is True, |x| < -1 is False) holds everywhere or nowhere.
+        if (eqs.Any(e => e is Sym { Name: "False" })) return Expr.List();
+        if (eqs.Count > 0 && eqs.All(e => e is Sym { Name: "True" }) && vars.Count == 1)
+            return Expr.List(Inequalities.Rel("<", Inequalities.Rel("<", -Expr.Infinity, vars[0]), Expr.Infinity));
+        eqs = eqs.Where(e => e is not Sym { Name: "True" }).ToList();
 
         if (eqs.Any(e => e is FnExpr { Name: "@rel" }))
         {
