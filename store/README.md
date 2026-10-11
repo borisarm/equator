@@ -1,9 +1,12 @@
-# Microsoft Store submission — EquatorSolver 1.0.0.0
+# Microsoft Store submission — EquatorSolver 1.2.0.0
 
 Store ID: `9P7WTJNFC7J8` — Store page https://apps.microsoft.com/detail/9P7WTJNFC7J8
 
-Everything Partner Center asks for, in the order its pages appear. The package is built from the `v1.0.0.0` tag
-with `.\tools\package.ps1` and lands in `AppPackages\Equator_1.0.0.0.msixupload` (not in git).
+Everything Partner Center asks for, in the order its pages appear. The package is built from the `v1.2.0.0` tag
+with `.\tools\package.ps1 -Version 1.2.0.0` and lands in `AppPackages\Equator_1.2.0.0.msixupload` (not in git).
+
+Releases: 1.0.0.0 (first release), 1.1.0.0 (7-day trial), 1.2.0.0 (matrix decompositions, row-reduction
+checking, solver and simplifier fixes; listings lead with "offline, no ads, no account").
 
 ## Pricing and availability
 Your choice of markets, price and release date. Nothing in the app restricts any market.
@@ -13,8 +16,7 @@ Your choice of markets, price and release date. Nothing in the app restricts any
   trial a banner shows the days left and a *Buy EquatorSolver* button (the Store purchase dialog); once the trial
   expires, notebooks still open, edit and save, but cells no longer evaluate until the app is bought. Without the
   trial setting, the app has no trial and simply runs as bought.
-- The trial and price take effect with the submission; the 1.0.0.0 package has no trial code, so publish a new
-  version (1.1.0.0 or later) together with the pricing change.
+- The trial code is in the app since 1.1.0.0; keep the 7-day free trial setting in every submission.
 
 ## Properties
 - Category: **Education** (Productivity also fits).
@@ -30,15 +32,19 @@ user interaction, sharing of location or personal data, purchases or unrestricte
 is the lowest rating in every region (for example Everyone / PEGI 3).
 
 ## Packages
-Upload `AppPackages\Equator_1.0.0.0.msixupload`. It holds x64 and ARM64 packages and declares eight languages:
-en-US, zh-Hans, hi, es, fr, ar, bn, pt-BR. The Windows App Certification Kit passed on this build (the two
+Upload `AppPackages\Equator_1.2.0.0.msixupload`. It holds x64 and ARM64 packages and declares eight languages:
+en-US, zh-Hans, hi, es, fr, ar, bn, pt-BR. Run the Windows App Certification Kit on each build before uploading,
+from an elevated prompt:
+`& "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\appcert.exe" test -appxpackagepath AppPackages\bundle\Equator.App_1.2.0.0_x64.msix -reportoutputpath store\wack.xml`
+It passed on the 1.1.0.0 build (the two
 failures it reports, Win2D metadata and "blocked executables" strings inside .NET, are optional tests and known
 false positives for every WinUI 3 / .NET app).
 
 ## Store listings
 One listing per package language. Copy the fields from `listing/<language>.md` and upload the screenshots from
 `screenshots/<language>/` in their numbered order (1920 × 1080 PNG); each listing file has the caption for each
-screenshot.
+screenshot. The "What's new in this version" section goes into the listing's release notes field (up to 1,500
+characters); update it with every submission.
 
 | Partner Center language | Listing | Screenshots |
 | --- | --- | --- |
