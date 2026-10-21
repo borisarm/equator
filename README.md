@@ -11,6 +11,11 @@ the front end is WinUI 3 with Win2D typesetting and plotting.
      → y(x) = sin(x)                                                       %2
 ```
 
+[![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-Equator-0067b8?logo=microsoft)](https://apps.microsoft.com/detail/9P7WTJNFC7J8)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Available on the **Microsoft Store**: <https://apps.microsoft.com/detail/9P7WTJNFC7J8> (free trial).
+
 ## Features
 
 **Engine (`Equator.Core`)**
