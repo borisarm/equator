@@ -4,34 +4,16 @@
 #include <string>
 #include <vector>
 
+#include "equator/kernel_api.hpp"
+
 namespace equator {
 
-struct Cell {
-    std::string id;
-    std::string input;
-    std::string language = "equator";
-};
-
-struct EvaluationResult {
-    std::string output_text;
-    std::string output_latex;
-    std::optional<std::string> error;
-    std::vector<std::string> warnings;
-};
-
-struct PlotSpec {
-    std::string type;
-    std::vector<std::string> arguments;
-};
-
-class Kernel {
+class NativeKernel final : public Kernel {
 public:
-    virtual ~Kernel() = default;
-
-    virtual void load_notebook(const std::string& json) = 0;
-    virtual void execute_cell(const Cell& cell) = 0;
-    virtual EvaluationResult evaluate_expression(const std::string& expr) = 0;
-    virtual std::string serialize_notebook() const = 0;
+    void load_notebook(const std::string& json) override;
+    void execute_cell(const Cell& cell) override;
+    EvaluationResult evaluate_expression(const std::string& expr) override;
+    std::string serialize_notebook() const override;
 };
 
 } // namespace equator
