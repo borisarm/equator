@@ -1,5 +1,6 @@
 add_library(equator_core
     src/kernel.cpp
+    src/parser.cpp
 )
 
 target_include_directories(equator_core
