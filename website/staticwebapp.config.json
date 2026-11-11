@@ -4,7 +4,9 @@
     { "route": "/privacidad", "redirect": "/es/privacidad", "statusCode": 301 },
     { "route": "/soporte", "redirect": "/es/soporte", "statusCode": 301 },
     { "route": "/es/privacy", "redirect": "/es/privacidad", "statusCode": 301 },
-    { "route": "/es/support", "redirect": "/es/soporte", "statusCode": 301 }
+    { "route": "/es/support", "redirect": "/es/soporte", "statusCode": 301 },
+    { "route": "/como-funciona", "redirect": "/es/como-funciona", "statusCode": 301 },
+    { "route": "/es/how-it-works", "redirect": "/es/como-funciona", "statusCode": 301 }
   ],
   "responseOverrides": {
     "404": { "rewrite": "/404.html" }

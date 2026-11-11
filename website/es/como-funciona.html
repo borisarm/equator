@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cómo funciona — EquatorSolver</title>
+  <meta name="description" content="Cómo está hecho EquatorSolver, de dónde vienen sus algoritmos y cómo se comprueban sus respuestas.">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="alternate" hreflang="en" href="https://www.equatorsol.es/how-it-works">
+  <link rel="alternate" hreflang="es" href="https://www.equatorsol.es/es/como-funciona">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/es/"><img src="/assets/logo.png" alt="">EquatorSolver</a>
+    <nav>
+      <a href="/es/">Inicio</a>
+      <a href="/es/como-funciona" aria-current="page">Cómo funciona</a>
+      <a href="/es/soporte">Soporte</a>
+      <a href="https://github.com/borisarm/equator">GitHub</a>
+      <a class="lang" href="/how-it-works" hreflang="en" lang="en">English</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1>Cómo funciona</h1>
+  <p class="updated">Cómo está hecho EquatorSolver, de dónde vienen sus algoritmos y cómo se comprueban sus respuestas</p>
+
+  <h2>Hecho desde cero</h2>
+  <p>El motor matemático de EquatorSolver está escrito desde cero en C# sobre .NET 10. No envuelve otro sistema de
+    álgebra computacional ni usa bibliotecas matemáticas de terceros: el analizador, la aritmética exacta, el álgebra
+    de polinomios, el cálculo, los números de precisión arbitraria y la composición tipográfica forman parte del
+    proyecto.</p>
+  <p>La aplicación para Windows usa WinUI 3 (Windows App SDK) para la interfaz y Win2D para dibujar. Las fórmulas
+    se componen con un sistema de cajas propio al estilo de TeX, y las gráficas se dibujan con Win2D. Todo se ejecuta
+    en tu PC: la aplicación no tiene servidor y nunca se conecta a internet.</p>
+  <p>El código fuente es abierto, con licencia MIT:
+    <a href="https://github.com/borisarm/equator">github.com/borisarm/equator</a>.</p>
+
+  <h2>De lo que escribes a la respuesta</h2>
+  <ol>
+    <li><strong>Análisis.</strong> Lo que escribes, por ejemplo <code>integrate(x^2 sin(x), x)</code>, lo lee un
+      analizador por precedencia de operadores y lo convierte en un árbol de expresión.</li>
+    <li><strong>Forma canónica.</strong> Las expresiones se mantienen siempre en forma canónica: las sumas y productos
+      se aplanan y ordenan, los términos semejantes se agrupan y los números son exactos (fracciones, no decimales).
+      Así, expresiones iguales se escriben igual, lo que hace sencillo y fiable cada paso posterior.</li>
+    <li><strong>Evaluación.</strong> El núcleo evalúa el árbol en orden y llama a la orden que pediste. Recuerda tus
+      variables, tus funciones y los resultados numerados (<code>%3</code>).</li>
+    <li><strong>Presentación.</strong> El resultado se convierte en cajas tipográficas y se dibuja como fórmula. El
+      mismo resultado se puede copiar como texto, LaTeX o imagen.</li>
+  </ol>
+
+  <h2>De dónde vienen los algoritmos</h2>
+  <p>Los algoritmos no son inventados: son métodos estándar y publicados del álgebra computacional y del análisis
+    numérico, implementados a partir de su descripción en la bibliografía. Los principales:</p>
+  <ul>
+    <li><strong>Factorización de polinomios:</strong> el método de Zassenhaus. El polinomio se factoriza módulo un
+      primo pequeño con el algoritmo de Cantor–Zassenhaus, los factores se elevan con el levantamiento de Hensel
+      (hasta un módulo elegido con la cota de Mignotte) y se recombinan en factores verdaderos, según von zur Gathen
+      y Gerhard, <em>Modern Computer Algebra</em>. Los polinomios de varias variables se factorizan a través de una
+      imagen en una variable y levantamiento de Hensel con el truco de Wang para el coeficiente principal. Antes se
+      separan los factores repetidos con la descomposición libre de cuadrados de Yun.</li>
+    <li><strong>Máximo común divisor:</strong> la heurística GCDHEU de Char, Geddes y Gonnet.</li>
+    <li><strong>Ecuaciones:</strong> raíces exactas con radicales cuando existen, incluida la fórmula de Cardano para
+      cúbicas (en forma trigonométrica cuando las tres raíces son reales); resultantes mediante la matriz de Sylvester
+      para eliminar variables en sistemas.</li>
+    <li><strong>Álgebra lineal:</strong> aritmética exacta sobre los racionales, con la eliminación sin fracciones de
+      Bareiss para determinantes y la eliminación gaussiana para sistemas; descomposiciones LU, QR (Gram–Schmidt),
+      Cholesky y forma de Jordan calculadas de forma exacta; la descomposición en valores singulares con el método de
+      Jacobi unilateral.</li>
+    <li><strong>Integrales:</strong> un integrador heurístico en la tradición de «derivada que divide»: una tabla de
+      integrales, fracciones parciales para funciones racionales, sustitución, reescritura trigonométrica,
+      integración por partes y radicales cuadráticos. Cada primitiva se deriva de nuevo y debe coincidir con el
+      integrando antes de mostrarse.</li>
+    <li><strong>Límites:</strong> continuidad, regla de L'Hôpital y reescritura de formas indeterminadas (0·∞,
+      ∞ − ∞, formas exponenciales), con un respaldo numérico que usa la extrapolación de Richardson.</li>
+    <li><strong>Sumas y series:</strong> sumas polinómicas por interpolación de Lagrange; series alternadas
+      aceleradas con el método de Cohen–Villegas–Zagier; ζ(2n) mediante números de Bernoulli; desarrollos de Taylor y
+      de Laurent.</li>
+    <li><strong>Ecuaciones diferenciales:</strong> ecuaciones separables y lineales de primer orden, y ecuaciones
+      lineales con coeficientes constantes de cualquier orden mediante las raíces características y la variación de
+      parámetros.</li>
+    <li><strong>Métodos numéricos:</strong> iteración de Durand–Kerner con refinamiento de Newton para todas las
+      raíces de un polinomio; método de Brent para raíces reales de funciones; cuadratura adaptativa de Gauss–Kronrod
+      (7–15) y tanh-sinh (doble exponencial) para integrales definidas; método de Newton para sistemas.</li>
+    <li><strong>Cualquier precisión:</strong> números de coma flotante de precisión arbitraria propios, con π a partir
+      de la fórmula de Machin.</li>
+    <li><strong>Reconocimiento de constantes exactas:</strong> el algoritmo de relaciones enteras PSLQ de Ferguson y
+      Bailey encuentra racionales, números algebraicos y combinaciones de π, e, logaritmos y raíces cuadradas a partir
+      de decimales de alta precisión. Cada candidato se vuelve a evaluar y debe coincidir en casi todas sus cifras
+      antes de aceptarse.</li>
+    <li><strong>Supuestos</strong> como <code>x &gt; 0</code> se siguen con aritmética de intervalos; así decide la
+      aplicación los signos y simplifica, por ejemplo, <code>sqrt(x^2)</code> a <code>x</code>.</li>
+    <li><strong>Comprobación de tu trabajo:</strong> cada línea de una solución se compara con la anterior. Las
+      ecuaciones, sistemas e inecuaciones deben conservar el mismo conjunto de soluciones, y las expresiones deben
+      seguir siendo iguales (en integrales indefinidas, salvo una constante). Así encuentra el comprobador el primer
+      paso incorrecto y detecta soluciones perdidas o sobrantes.</li>
+  </ul>
+
+  <h2>Cómo se comprueban las respuestas</h2>
+  <p>Unas 4.700 pruebas automáticas se ejecutan con cada cambio. Además de comparar con respuestas esperadas, muchas
+    pruebas contrastan un resultado con un cálculo independiente: integrales definidas con cuadratura numérica,
+    primitivas derivándolas, soluciones de ecuaciones sustituyéndolas, factorizaciones multiplicándolas de nuevo y
+    descomposiciones de matrices por sus propiedades. También se generan expresiones aleatorias para probar el
+    desarrollo, la factorización, la simplificación y la derivación.</p>
+  <p>Unas 2.500 de esas pruebas son ejercicios de los libros de álgebra de OpenStax (CC BY 4.0) con la respuesta del
+    propio libro: la aplicación los resuelve, factoriza y simplifica, y su respuesta se compara con la del libro. Las
+    pocas excepciones están listadas en el código fuente, cada una con su motivo.</p>
+
+  <h2>Limitaciones</h2>
+  <p>EquatorSolver es un sistema de álgebra computacional compacto. La integración es heurística (cada resultado se
+    verifica, pero no hay un algoritmo de Risch completo), así que algunas integrales con forma cerrada no se
+    encuentran. Los polinomios de grado cuatro o superior que no se pueden factorizar obtienen raíces numéricas,
+    salvo formas especiales. Las ecuaciones devuelven soluciones principales, no familias generales como
+    <code>x = π/6 + 2kπ</code>; para listar todas las soluciones en un rango, indica un intervalo:
+    <code>solve(2 sin(3t) = 1, t, 0, 2π)</code>.</p>
+
+  <h2>Código fuente y descargas</h2>
+  <ul>
+    <li>Código fuente (licencia MIT): <a href="https://github.com/borisarm/equator">github.com/borisarm/equator</a></li>
+    <li>Versión portátil sin Microsoft Store (un zip, sin instalador):
+      <a href="https://github.com/borisarm/equator/releases/latest">versiones en GitHub</a></li>
+    <li>Microsoft Store: <a href="https://apps.microsoft.com/detail/9P7WTJNFC7J8?hl=es-ES">EquatorSolver</a> (gratis)</li>
+  </ul>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Boris Armenta</span>
+    <nav>
+      <a href="/es/como-funciona" aria-current="page">Cómo funciona</a>
+      <a href="/es/privacidad">Privacidad</a>
+      <a href="/es/soporte">Soporte</a>
+      <a href="https://github.com/borisarm/equator">GitHub</a>
+      <a href="mailto:support@equatorsol.es">support@equatorsol.es</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

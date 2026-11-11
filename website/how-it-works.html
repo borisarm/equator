@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How it works — EquatorSolver</title>
+  <meta name="description" content="How EquatorSolver is built, where its algorithms come from, and how its answers are tested.">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="alternate" hreflang="en" href="https://www.equatorsol.es/how-it-works">
+  <link rel="alternate" hreflang="es" href="https://www.equatorsol.es/es/como-funciona">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt="">EquatorSolver</a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/how-it-works" aria-current="page">How it works</a>
+      <a href="/support">Support</a>
+      <a href="https://github.com/borisarm/equator">GitHub</a>
+      <a class="lang" href="/es/como-funciona" hreflang="es" lang="es">Español</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1>How it works</h1>
+  <p class="updated">How EquatorSolver is built, where its algorithms come from, and how its answers are tested</p>
+
+  <h2>Built from scratch</h2>
+  <p>EquatorSolver's mathematics engine was written from scratch in C# on .NET 10. It doesn't wrap another computer
+    algebra system and doesn't use any third-party mathematics library: the parser, exact arithmetic, polynomial
+    algebra, calculus, arbitrary-precision numbers and typesetting are all part of the project.</p>
+  <p>The Windows app uses WinUI 3 (the Windows App SDK) for its interface and Win2D for drawing. Formulas are laid
+    out by the app's own TeX-style box layout, and plots are drawn with Win2D. Everything runs on your PC: the app has
+    no server and never connects to the internet.</p>
+  <p>The source code is open under the MIT license:
+    <a href="https://github.com/borisarm/equator">github.com/borisarm/equator</a>.</p>
+
+  <h2>From what you type to the answer</h2>
+  <ol>
+    <li><strong>Parsing.</strong> Your input, such as <code>integrate(x^2 sin(x), x)</code>, is read by a precedence
+      parser into an expression tree.</li>
+    <li><strong>Canonical form.</strong> Expressions are always kept in a canonical form: sums and products are
+      flattened and sorted, like terms are combined and numbers stay exact (fractions, not decimals). Equal
+      expressions therefore look the same, which keeps every later step simple and reliable.</li>
+    <li><strong>Evaluation.</strong> The kernel evaluates the tree in order and calls the command you asked for.
+      It remembers your variables, your own functions and the numbered results (<code>%3</code>).</li>
+    <li><strong>Display.</strong> The result is turned into typesetting boxes and drawn as a formula. The same
+      result can be copied as plain text, LaTeX or an image.</li>
+  </ol>
+
+  <h2>Where the algorithms come from</h2>
+  <p>The algorithms aren't invented here. They are standard, published methods from computer algebra and numerical
+    analysis, implemented from their descriptions in the literature. The main ones:</p>
+  <ul>
+    <li><strong>Factoring polynomials:</strong> the Zassenhaus approach. A polynomial is factored modulo a small prime
+      with the Cantor–Zassenhaus algorithm, the factors are lifted with Hensel lifting (to a modulus chosen from the
+      Mignotte bound), and then recombined into true factors, following von zur Gathen and Gerhard, <em>Modern
+      Computer Algebra</em>. Polynomials in several variables are factored through a one-variable image and Hensel
+      lifting with Wang's leading-coefficient trick. Repeated factors are separated first with Yun's square-free
+      decomposition.</li>
+    <li><strong>Greatest common divisors:</strong> the GCDHEU heuristic of Char, Geddes and Gonnet.</li>
+    <li><strong>Equations:</strong> exact roots in radicals where they exist, including Cardano's formula for cubics
+      (in trigonometric form when all three roots are real); resultants from the Sylvester matrix to eliminate
+      variables in systems.</li>
+    <li><strong>Linear algebra:</strong> exact arithmetic over the rationals, with Bareiss fraction-free elimination
+      for determinants and Gaussian elimination for linear systems; LU, QR (Gram–Schmidt), Cholesky and Jordan
+      forms computed exactly; the singular value decomposition with the one-sided Jacobi method.</li>
+    <li><strong>Integrals:</strong> a heuristic integrator in the "derivative-divides" tradition: a table of
+      integrals, partial fractions for rational functions, substitution, trigonometric rewriting, integration by
+      parts and quadratic radicals. Every antiderivative is differentiated back and must match the integrand before
+      it is shown.</li>
+    <li><strong>Limits:</strong> continuity, L'Hôpital's rule and rewriting of indeterminate forms (0·∞, ∞ − ∞,
+      exponential forms), with a numeric fallback that uses Richardson extrapolation.</li>
+    <li><strong>Sums and series:</strong> polynomial sums by Lagrange interpolation; alternating series accelerated
+      with the Cohen–Villegas–Zagier method; ζ(2n) through Bernoulli numbers; Taylor and Laurent expansions.</li>
+    <li><strong>Differential equations:</strong> separable and first-order linear equations, and linear equations
+      with constant coefficients of any order through the characteristic roots and variation of parameters.</li>
+    <li><strong>Numerical methods:</strong> Durand–Kerner iteration with Newton polishing for all roots of a
+      polynomial; Brent's method for real roots of functions; adaptive Gauss–Kronrod (7–15) and tanh-sinh (double
+      exponential) quadrature for definite integrals; Newton's method for systems.</li>
+    <li><strong>Any precision:</strong> the app's own arbitrary-precision floating-point numbers, with π from
+      Machin's formula.</li>
+    <li><strong>Recognising exact constants:</strong> the PSLQ integer-relation algorithm of Ferguson and Bailey
+      finds rationals, algebraic numbers and combinations of π, e, logarithms and square roots from high-precision
+      decimals. Every candidate is evaluated again and must agree to nearly all its digits before it is accepted.</li>
+    <li><strong>Assumptions</strong> such as <code>x &gt; 0</code> are tracked with interval arithmetic, which is how
+      the app decides signs and simplifies, for example, <code>sqrt(x^2)</code> to <code>x</code>.</li>
+    <li><strong>Checking your work:</strong> each line of a worked solution is compared with the line before it.
+      Equations, systems and inequalities must keep the same solution set, and expressions must stay equal (for
+      indefinite integrals, up to a constant). That's how the checker finds the first wrong step and notices lost
+      or extra solutions.</li>
+  </ul>
+
+  <h2>How the answers are tested</h2>
+  <p>About 4,700 automated tests run on every change. Besides comparing with expected answers, many tests check a
+    result against an independent computation: definite integrals against numerical quadrature, antiderivatives by
+    differentiation, solutions of equations by substitution, factorisations by multiplying back and matrix
+    decompositions by their defining properties. Random expressions are generated to test expanding, factoring,
+    simplifying and differentiating.</p>
+  <p>About 2,500 of those tests are exercises from the OpenStax algebra textbooks (CC BY 4.0), with each book's own
+    answer: the app solves, factors and simplifies them and its answer is compared with the book's. The few
+    exceptions are listed in the source code, each with its reason.</p>
+
+  <h2>Limitations</h2>
+  <p>EquatorSolver is a compact computer algebra system. Integration is heuristic (every result is verified, but
+    there is no complete Risch algorithm), so some integrals that have a closed form aren't found. Polynomials of
+    degree four and higher that can't be factored get numeric roots, except for special forms. Equations return
+    principal solutions rather than general families such as <code>x = π/6 + 2kπ</code>; to list every solution in a
+    range, give an interval: <code>solve(2 sin(3t) = 1, t, 0, 2π)</code>.</p>
+
+  <h2>Source code and downloads</h2>
+  <ul>
+    <li>Source code (MIT license): <a href="https://github.com/borisarm/equator">github.com/borisarm/equator</a></li>
+    <li>Portable version without the Store (a zip, no installer):
+      <a href="https://github.com/borisarm/equator/releases/latest">GitHub releases</a></li>
+    <li>Microsoft Store: <a href="https://apps.microsoft.com/detail/9P7WTJNFC7J8">EquatorSolver</a> (free)</li>
+  </ul>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>© 2026 Boris Armenta</span>
+    <nav>
+      <a href="/how-it-works" aria-current="page">How it works</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/support">Support</a>
+      <a href="https://github.com/borisarm/equator">GitHub</a>
+      <a href="mailto:support@equatorsol.es">support@equatorsol.es</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
