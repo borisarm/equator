@@ -1,12 +1,13 @@
-# Microsoft Store submission — EquatorSolver 1.2.0.0
+# Microsoft Store submission — EquatorSolver 1.3.0.0
 
 Store ID: `9P7WTJNFC7J8` — Store page https://apps.microsoft.com/detail/9P7WTJNFC7J8
 
-Everything Partner Center asks for, in the order its pages appear. The package is built from the `v1.2.0.0` tag
-with `.\tools\package.ps1 -Version 1.2.0.0` and lands in `AppPackages\Equator_1.2.0.0.msixupload` (not in git).
+Everything Partner Center asks for, in the order its pages appear. The package is built from the `v1.3.0.0` tag
+with `.\tools\package.ps1 -Version 1.3.0.0` and lands in `AppPackages\1.3.0.0\Equator_1.3.0.0.msixupload` (not in git).
 
 Releases: 1.0.0.0 (first release), 1.1.0.0 (7-day trial), 1.2.0.0 (matrix decompositions, row-reduction
-checking, solver and simplifier fixes; listings lead with "offline, no ads, no account").
+checking, solver and simplifier fixes; listings lead with "offline, no ads, no account"), 1.3.0.0 (solve in an
+interval, real odd roots of negative numbers, more trigonometric simplifications, safer notebook files).
 
 ## Pricing and availability
 Your choice of markets, price and release date. Nothing in the app restricts any market.
@@ -32,10 +33,10 @@ user interaction, sharing of location or personal data, purchases or unrestricte
 is the lowest rating in every region (for example Everyone / PEGI 3).
 
 ## Packages
-Upload `AppPackages\Equator_1.2.0.0.msixupload`. It holds x64 and ARM64 packages and declares eight languages:
+Upload `AppPackages\1.3.0.0\Equator_1.3.0.0.msixupload`. It holds x64 and ARM64 packages and declares eight languages:
 en-US, zh-Hans, hi, es, fr, ar, bn, pt-BR. Run the Windows App Certification Kit on each build before uploading,
 from an elevated prompt:
-`& "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\appcert.exe" test -appxpackagepath AppPackages\bundle\Equator.App_1.2.0.0_x64.msix -reportoutputpath store\wack.xml`
+`& "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\appcert.exe" test -appxpackagepath AppPackages\1.3.0.0\bundle\Equator.App_1.3.0.0_x64.msix -reportoutputpath store\wack.xml`
 It passed on the 1.1.0.0 build (the two
 failures it reports, Win2D metadata and "blocked executables" strings inside .NET, are optional tests and known
 false positives for every WinUI 3 / .NET app).

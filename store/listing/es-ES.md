@@ -49,14 +49,11 @@ Pruébalo gratis durante 7 días y, después, cómpralo una sola vez: sin suscri
 - Ocho idiomas, incluido el árabe de derecha a izquierda
 
 ## Novedades de esta versión
-• Factorizaciones de matrices: lu, qr, cholesky y svd, además de valores singulares y número de condición.
-• diagonalize y jordan, polinomio mínimo y exponencial de matrices expm(A, t), que resuelve sistemas x' = A·x.
-• Gram–Schmidt, espacios columna y fila, proyecciones, mínimos cuadrados (lsq) y pseudoinversa (pinv).
-• check() comprueba ahora la reducción por filas hecha a mano: empieza con una matriz, escribe una matriz por paso, si quieres con sus operaciones de filas (F2 → F2 − 3F1), y se verifica cada paso.
-• Las ecuaciones trigonométricas con ángulos múltiples, como cos(2t) = sin(t), se resuelven de forma exacta.
-• simplify escribe los cocientes complejos como a + bi y combina raíces: 15·⁴√125 / ⁴√5 = 15√5.
-• Corregido: las inecuaciones que siempre se cumplen, como |x + 9| ≥ −6, dan ahora todos los números reales.
-• Probado con unos 2500 ejercicios de libros de texto abiertos de álgebra.
+• solve(ec, x, a, b) da todas las soluciones en un intervalo: solve(2·sin(3t) = 1, t, 0, 2π) da las seis.
+• Las raíces impares de números negativos son reales: (−27)^(1/3) = ∛(−27) = −3, así que x^(1/3) = −3 ahora da x = −27.
+• simplify conoce más identidades trigonométricas: transformaciones de suma en producto, las fórmulas del ángulo en sentido inverso y cot; por ejemplo, tan(π/2 − x) = cot(x) y (sin 9t − sin 3t)/(cos 9t + cos 3t) = tan(3t).
+• Abrir y guardar cuadernos es más seguro: los archivos demasiado grandes o dañados se rechazan con un mensaje.
+• Probado con unos 2.500 ejercicios de libros abiertos de álgebra.
 
 ## Leyendas de las capturas
 1. Escribe matemáticas como en papel y obtén respuestas exactas.
