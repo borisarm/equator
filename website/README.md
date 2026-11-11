@@ -45,6 +45,13 @@ Status (9 October 2026): `www.equatorsol.es` is connected and serves HTTPS with 
 does not load; always publish links with `www`. To fix it, host the DNS zone where the bare domain can alias the
 app (Azure DNS, a few cents a month, or Cloudflare's free plan) and add `equatorsol.es` as a second custom domain.
 
+## While the project is paused
+
+The site was last deployed on 11 November 2026 (the app became free) and stays online on the Free plan. The Store
+listing points to `https://www.equatorsol.es/privacy` and `/support`, so keep the domain `equatorsol.es` renewed
+at GoDaddy, or else change the privacy policy and support URLs in Partner Center to the default
+`azurestaticapps.net` address above before the domain lapses, so the listing's links keep working.
+
 ## Updating
 
 - The download buttons in `index.html` and `es/index.html` link to the Store page of Store ID `9P7WTJNFC7J8`

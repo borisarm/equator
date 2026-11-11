@@ -16,6 +16,19 @@ the front end is WinUI 3 with Win2D typesetting and plotting.
 
 Available on the **Microsoft Store**: <https://apps.microsoft.com/detail/9P7WTJNFC7J8> (free).
 
+## Project status
+
+**Paused since 11 November 2026.** The last release is **1.3.0.0**, and the app is free on the Microsoft Store
+(no trial, no in-app purchases). No further releases are planned for now:
+
+- The app earns no money, and the macOS and iOS versions were shelved because publishing for Apple requires a
+  paid developer account.
+- The Store listing, the website (`website/`) and this repository stay up as they are. Issues and pull requests
+  may not get a reply for a while.
+
+To pick it up again: `store/README.md` has the submission steps and listing texts, `website/README.md` covers
+hosting and deployment, and `docs/native-engine-findings.md` records why the engine stays in C#.
+
 ## Features
 
 **Engine (`Equator.Core`)**
