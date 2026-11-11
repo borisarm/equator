@@ -75,6 +75,12 @@ public static class BigEval
                     if (pw.Exponent is Num { Value.IsInteger: true } ni && BigInteger.Abs(ni.Value.Num) < 1_000_000)
                         return IntPow(b, (int)ni.Value.Num, p);
                     if (pw.Base == Expr.E) return Exp(Eval(pw.Exponent, p, vars), p);
+                    // Odd roots of negative reals are real: (-27)^(1/3) = -3 (NumericEval.OddRootPower).
+                    if (b.IsReal && b.Re.Sign < 0 && pw.Exponent is Num { Value: var q } && !q.IsInteger && !q.Den.IsEven)
+                    {
+                        var magnitude = Pow(-b, Eval(pw.Exponent, p, vars), p);
+                        return q.Num.IsEven ? magnitude : -magnitude;
+                    }
                     return Pow(b, Eval(pw.Exponent, p, vars), p);
                 }
             case FnExpr f:

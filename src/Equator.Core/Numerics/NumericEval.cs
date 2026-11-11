@@ -42,12 +42,30 @@ public static class NumericEval
                         return IntPow(b, (int)ni.Value.Num);
                     var x = Eval(p.Exponent, vars);
                     if (b.Imaginary == 0 && x.Imaginary == 0 && b.Real >= 0) return Math.Pow(b.Real, x.Real);
+                    if (b.Imaginary == 0 && OddRootPower(p.Exponent) is { } odd) return odd(b.Real);
                     return Complex.Pow(b, x);
                 }
             case FnExpr f:
                 return EvalFunction(f.Name, f.Args.Select(a => Eval(a, vars)).ToArray());
         }
         throw new MathException(Messages.T("Cannot evaluate {0} numerically.", e));
+    }
+
+    /// <summary>
+    /// For an exponent p/q with q odd, the real power t ↦ t^(p/q), which is defined for negative t too
+    /// ((-27)^(1/3) = -3, (-8)^(2/3) = 4); null for any other exponent.
+    /// </summary>
+    public static Func<double, double>? OddRootPower(Expr exponent)
+    {
+        if (exponent is not Num { Value: var q } || q.IsInteger || q.Den.IsEven) return null;
+        double qe = q.ToDouble();
+        bool oddNum = !q.Num.IsEven;
+        return t =>
+        {
+            if (t >= 0) return Math.Pow(t, qe);
+            var mag = Math.Pow(-t, qe);
+            return oddNum ? -mag : mag;
+        };
     }
 
     public static double EvalReal(Expr e)

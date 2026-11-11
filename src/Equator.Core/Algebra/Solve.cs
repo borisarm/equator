@@ -1,3 +1,4 @@
+using System.Numerics;
 using Equator.Core.Numerics;
 
 namespace Equator.Core.Algebra;
@@ -937,5 +938,99 @@ public static class Solver
         }
         if (found.Count == 0) throw new MathException(Messages.T("Could not solve this system."));
         return found.Select(s => vars.Select((v, i) => (v, (Expr)new Real(Math.Abs(s[i]) < 1e-13 ? 0 : s[i]))).ToDictionary(p => p.v, p => p.Item2)).ToList();
+    }
+
+    // ---- solutions in an interval -------------------------------------------------------------
+
+    /// <summary>Most solutions solve(eq, x, a, b) lists before giving up.</summary>
+    private const int MaxIntervalSolutions = 1000;
+
+    /// <summary>
+    /// The real solutions of one equation in x that lie in [lo, hi], in increasing order: solve(eq, x, a, b).
+    /// solve(eq, x) gives a periodic equation's solutions over one period; here each is shifted by multiples of
+    /// half the shortest period of the trigonometric functions of x in the equation. Every solution is congruent
+    /// to a listed one modulo the equation's period, which is a multiple of that step, so none is missed; shifted
+    /// values that do not satisfy the equation are discarded numerically.
+    /// </summary>
+    public static Expr SolveInInterval(Expr equation, Expr x, double lo, double hi)
+    {
+        if (lo > hi) (lo, hi) = (hi, lo);
+        var f = equation is EqExpr q ? q.Lhs - q.Rhs : equation;
+        var solved = Solve(equation, x);
+        var roots = new List<Expr>();
+        foreach (var item in solved is ListExpr l ? l.Items : [solved])
+        {
+            var value = item switch
+            {
+                EqExpr { Lhs: var lhs, Rhs: var rhs } when lhs == x => rhs,
+                ListExpr { Items: [EqExpr { Lhs: var lhs, Rhs: var rhs }] } when lhs == x => rhs,
+                _ => null,
+            };
+            if (value is not null && value.IsConstant) roots.Add(value);
+        }
+
+        var step = HalfPeriod(f, x);
+        double tolerance = 1e-9 * Math.Max(1, Math.Max(Math.Abs(lo), Math.Abs(hi)));
+        var found = new List<(double At, Expr Value)>();
+        void Consider(Expr v)
+        {
+            double at = NumericEval.EvalReal(v);
+            if (double.IsNaN(at) || at < lo - tolerance || at > hi + tolerance) return;
+            if (found.Any(p => Math.Abs(p.At - at) <= tolerance)) return;
+            if (step is not null && !Satisfies(f, x, v)) return;
+            if (found.Count >= MaxIntervalSolutions)
+                throw new MathException(Messages.T("solve: more than {0} solutions in the interval.", MaxIntervalSolutions));
+            found.Add((at, v));
+        }
+
+        foreach (var r in roots)
+        {
+            if (step is null) { Consider(r); continue; }
+            double at = NumericEval.EvalReal(r), s = NumericEval.EvalReal(step);
+            if (double.IsNaN(at) || !(s > 0)) continue;
+            long first = (long)Math.Ceiling((lo - tolerance - at) / s), last = (long)Math.Floor((hi + tolerance - at) / s);
+            if (last - first > 4L * MaxIntervalSolutions)
+                throw new MathException(Messages.T("solve: more than {0} solutions in the interval.", MaxIntervalSolutions));
+            for (long n = first; n <= last; n++)
+            {
+                Engine.Interrupt.Check();
+                Consider(Expansion.Expand(r + new Num(n) * step));
+            }
+        }
+        return Expr.List(found.OrderBy(p => p.At).Select(p => Expr.Equation(x, p.Value)));
+    }
+
+    /// <summary>
+    /// Half the shortest period of the trigonometric functions of x in e (π/|k| for each f(k·x + c)), or null
+    /// when e has none, or when one of their arguments is not linear in x with a numeric coefficient.
+    /// </summary>
+    private static Expr? HalfPeriod(Expr e, Expr x)
+    {
+        Expr? step = null;
+        double best = double.PositiveInfinity;
+        foreach (var sub in e.Subexpressions())
+        {
+            if (sub is not FnExpr { Name: "sin" or "cos" or "tan" or "cot" or "sec" or "csc" } fn || !fn.Args[0].Contains(x)) continue;
+            var k = Calculus.Derivative.Diff(fn.Args[0], x);
+            if (k.Contains(x) || !k.IsConstant) return null;
+            double kv = Math.Abs(NumericEval.EvalReal(k));
+            if (double.IsNaN(kv) || kv == 0) return null;
+            if (Math.PI / kv < best) { best = Math.PI / kv; step = Expansion.Expand(Expr.Pi / (k.IsNegativeNumber ? -k : k)); }
+        }
+        if (step is null) return null;
+        // A non-numeric coefficient (pi*x) leaves a sign the expansion cannot see: take the magnitude numerically.
+        return NumericEval.EvalReal(step) < 0 ? Expansion.Expand(-step) : step;
+    }
+
+    private static bool Satisfies(Expr f, Expr x, Expr value)
+    {
+        try
+        {
+            var at = NumericEval.Eval(f.Substitute(x, value));
+            double scale = 1 + f.Subexpressions().OfType<FnExpr>().Count();
+            return Complex.Abs(at) <= 1e-8 * scale;
+        }
+        catch (MathException) { return false; }
+        catch (DivideByZeroException) { return false; }
     }
 }

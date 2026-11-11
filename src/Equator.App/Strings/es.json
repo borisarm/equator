@@ -160,7 +160,7 @@
   "fn.numer": "Numerador tras combinar las fracciones.",
   "fn.denom": "Denominador tras combinar las fracciones.",
   "fn.trigsimp": "Simplifica usando identidades trigonométricas.",
-  "fn.solve": "Resuelve ecuaciones y sistemas de forma exacta cuando es posible (numéricamente en otro caso).",
+  "fn.solve": "Resuelve ecuaciones y sistemas de forma exacta cuando es posible (numéricamente en otro caso). Con un intervalo, solve(eq, x, a, b) da todas las soluciones en [a, b].",
   "fn.nsolve": "Raíces reales halladas numéricamente (en [-100, 100] por defecto, o en [a, b]).",
   "fn.subs": "Sustituye variables por valores.",
   "fn.lhs": "Miembro izquierdo de una ecuación.",

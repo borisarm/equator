@@ -136,6 +136,7 @@
   "table: expected a variable name as the second argument.": "table: দ্বিতীয় আর্গুমেন্ট হিসেবে চলকের নাম প্রত্যাশিত ছিল।",
   "table: too many elements.": "table: খুব বেশি উপাদান।",
   "range: too many elements.": "range: খুব বেশি উপাদান।",
+  "solve: more than {0} solutions in the interval.": "solve: ব্যবধানে {0}টির বেশি সমাধান।",
   "mean of an empty list.": "ফাঁকা তালিকার গড়।",
   "median of an empty list.": "ফাঁকা তালিকার মধ্যমা।",
   "clear: expected names.": "clear: নাম প্রত্যাশিত ছিল।",

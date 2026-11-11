@@ -136,6 +136,7 @@
   "table: expected a variable name as the second argument.": "table: كان متوقعًا اسم متغير وسيطًا ثانيًا.",
   "table: too many elements.": "table: عدد العناصر كبير جدًا.",
   "range: too many elements.": "range: عدد العناصر كبير جدًا.",
+  "solve: more than {0} solutions in the interval.": "solve: أكثر من {0} حلًا في المجال.",
   "mean of an empty list.": "وسط قائمة فارغة.",
   "median of an empty list.": "وسيط قائمة فارغة.",
   "clear: expected names.": "clear: كان متوقعًا أسماء.",

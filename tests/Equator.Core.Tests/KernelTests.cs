@@ -65,6 +65,23 @@ public class KernelTests
     [InlineData("solve(2x + 3 = 7, x)", "[x = 2]")]
     [InlineData("solve(x^2 - 2 = 0, x)", "[x = -sqrt(2), x = sqrt(2)]")]
     [InlineData("solve(exp(2x) = 5, x)", "[x = log(5)/2]")]
+    // odd roots of negative numbers are real; even roots stay complex
+    [InlineData("(-27)^(1/3)", "-3")]
+    [InlineData("root(-64/27, 3)", "-4/3")]
+    [InlineData("(-8)^(2/3)", "4")]
+    [InlineData("(-32)^(1/5)", "-2")]
+    [InlineData("(-4)^(1/2)", "2*I")]
+    [InlineData("N((-2)^(1/3), 20)", "-1.2599210498948731648")]
+    [InlineData("subs(x^(1/3), x, -8)", "-2")]
+    [InlineData("solve(x^(1/3) = -3, x)", "[x = -27]")]
+    [InlineData("solve(root(4x + 5, 3) = -3, x)", "[x = -8]")]
+    [InlineData("solve(x^3 = -8, x)", "[x = -2, x = 1 - I*sqrt(3), x = 1 + I*sqrt(3)]")]
+    // solving in an interval: every solution in [a, b], in order
+    [InlineData("solve(2*sin(3*t) = 1, t, 0, 2*pi)", "[t = pi/18, t = 5*pi/18, t = 13*pi/18, t = 17*pi/18, t = 25*pi/18, t = 29*pi/18]")]
+    [InlineData("solve(sin(x)^2 = 1/4, x, 0, 2*pi)", "[x = pi/6, x = 5*pi/6, x = 7*pi/6, x = 11*pi/6]")]
+    [InlineData("solve(tan(x) = 1, x, -pi, pi)", "[x = -3*pi/4, x = pi/4]")]
+    [InlineData("solve(2*sin(pi*t) = 1, t, 0, 3)", "[t = 1/6, t = 5/6, t = 13/6, t = 17/6]")]
+    [InlineData("solve(x^2 = 4, x, 0, 10)", "[x = 2]")]
     [InlineData("solve([x + y = 3, x - y = 1], [x, y])", "[[x = 2, y = 1]]")]
     [InlineData("solve(a*x^2 + b*x + c = 0, x)", "[x = (-b - sqrt(b^2 - 4*a*c))/(2*a), x = (-b + sqrt(b^2 - 4*a*c))/(2*a)]")]
     // calculus
@@ -149,6 +166,10 @@ public class KernelTests
         Assert.Equal(OutputKind.Error, r.Outputs[0].Kind);
         r = k.Evaluate("inv([[1, 2], [2, 4]])");
         Assert.Contains("singular", r.Outputs[0].Text);
+        r = k.Evaluate("solve(sin(x) = 0, x, 0, 10000)");
+        Assert.Equal("solve: more than 1000 solutions in the interval.", r.Outputs[0].Text);
+        r = k.Evaluate("solve(x = 1, x, 0)");
+        Assert.Equal("solve: expected a variable and a range, e.g. solve(..., x, 0, 1).", r.Outputs[0].Text);
     }
 
     [Fact]

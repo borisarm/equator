@@ -302,8 +302,14 @@ public static class Builtins
         Add("numer", Alg, "numer(expr)", "Numerator after combining fractions.", "numer((x+1)/(x-1))", 1, 1, (k, a) => Rational.NumDen(Rational.Together(a[0])).Num);
         Add("denom", Alg, "denom(expr)", "Denominator after combining fractions.", "denom((x+1)/(x-1))", 1, 1, (k, a) => Rational.NumDen(Rational.Together(a[0])).Den);
         Add("trigsimp", Alg, "trigsimp(expr)", "Simplifies using trigonometric identities.", "trigsimp(tan(x)*cos(x))", 1, 1, (k, a) => Simplifier.TrigSimplify(a[0]));
-        Add("solve", Alg, "solve(eq, x)  ·  solve([eq1, eq2], [x, y])", "Solves equations and systems exactly where possible (numerically otherwise).",
-            "solve(x^2 - 5x + 6 = 0, x)", 1, 2, (k, a) => Solver.Solve(a[0], a.Length > 1 ? a[1] : null), 1);
+        Add("solve", Alg, "solve(eq, x)  ·  solve([eq1, eq2], [x, y])  ·  solve(eq, x, a, b)",
+            "Solves equations and systems exactly where possible (numerically otherwise). With an interval, solve(eq, x, a, b) lists every solution in [a, b].",
+            "solve(x^2 - 5x + 6 = 0, x)", 1, 4, (k, a) => a.Length switch
+            {
+                <= 2 => Solver.Solve(a[0], a.Length > 1 ? a[1] : null),
+                4 => Solver.SolveInInterval(a[0], Var(a[1], "solve"), Dbl(a[2], "Lower bound"), Dbl(a[3], "Upper bound")),
+                _ => throw new MathException(Messages.T("{0}: expected a variable and a range, e.g. {0}(..., x, 0, 1).", "solve")),
+            }, 1);
         Add("nsolve", Alg, "nsolve(eq, x)  ·  nsolve(eq, x, a, b)", "Real roots found numerically (in [-100, 100] by default, or in [a, b]).",
             "nsolve(cos(x) = x, x)", 2, 4, (k, a) =>
             {

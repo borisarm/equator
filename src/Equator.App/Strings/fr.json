@@ -160,7 +160,7 @@
   "fn.numer": "Numérateur après réduction au même dénominateur.",
   "fn.denom": "Dénominateur après réduction au même dénominateur.",
   "fn.trigsimp": "Simplifie à l'aide des identités trigonométriques.",
-  "fn.solve": "Résout équations et systèmes de façon exacte si possible (numériquement sinon).",
+  "fn.solve": "Résout équations et systèmes de façon exacte si possible (numériquement sinon). Avec un intervalle, solve(eq, x, a, b) donne toutes les solutions dans [a, b].",
   "fn.nsolve": "Racines réelles trouvées numériquement (dans [-100, 100] par défaut, ou dans [a, b]).",
   "fn.subs": "Remplace des variables par des valeurs.",
   "fn.lhs": "Membre de gauche d'une équation.",
