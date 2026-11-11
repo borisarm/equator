@@ -9,6 +9,10 @@ Releases: 1.0.0.0 (first release), 1.1.0.0 (7-day trial), 1.2.0.0 (matrix decomp
 checking, solver and simplifier fixes; listings lead with "offline, no ads, no account"), 1.3.0.0 (solve in an
 interval, real odd roots of negative numbers, more trigonometric simplifications, safer notebook files).
 
+**Status (11 November 2026):** 1.3.0.0 is the current and last submitted package. The app was then made free
+(a listing and pricing update, no new package), and the project was paused. The steps below are kept so the
+next submission can start from them.
+
 ## Pricing and availability
 Your choice of markets, price and release date. Nothing in the app restricts any market.
 

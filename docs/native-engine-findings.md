@@ -50,8 +50,9 @@ so above 1 means native is slower.
 - Its one clear advantage, no JIT on first use, is worth little in practice. Precompiling the C# app with
   ReadyToRun recovers most of it, and even that was not worth its size (below).
 - A second language, the C++ toolchain, the C runtime setup and WinRT registration would weigh on every build.
-- The planned iOS port is .NET (Uno Platform), where the C# engine runs as is; the native engine would have
-  needed new bindings.
+- The iOS port that was planned at the time is .NET (Uno Platform), where the C# engine runs as is; the native
+  engine would have needed new bindings. (The macOS and iOS ports were shelved when the project was paused,
+  also on 2026-11-11; see the README's *Project status*.)
 
 ## ReadyToRun, measured and not adopted
 
