@@ -136,6 +136,7 @@
   "table: expected a variable name as the second argument.": "table: दूसरे तर्क के रूप में चर का नाम अपेक्षित था।",
   "table: too many elements.": "table: बहुत अधिक अवयव।",
   "range: too many elements.": "range: बहुत अधिक अवयव।",
+  "solve: more than {0} solutions in the interval.": "solve: अंतराल में {0} से अधिक हल हैं।",
   "mean of an empty list.": "खाली सूची का माध्य।",
   "median of an empty list.": "खाली सूची की माध्यिका।",
   "clear: expected names.": "clear: नाम अपेक्षित थे।",

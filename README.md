@@ -20,7 +20,8 @@ Available on the **Microsoft Store**: <https://apps.microsoft.com/detail/9P7WTJN
 
 **Engine (`Equator.Core`)**
 
-- Exact arithmetic: arbitrary-precision rationals, surds (`sqrt(12)` → `2√3`), complex numbers, π, e, ∞.
+- Exact arithmetic: arbitrary-precision rationals, surds (`sqrt(12)` → `2√3`), complex numbers, π, e, ∞. Odd roots
+  of negative numbers are real, as in textbooks: `(-27)^(1/3)` = `root(-27, 3)` = −3.
 - Arbitrary-precision floating point: `N(expr, digits)` to any number of significant digits (elementary
   functions, Γ, erf, ζ, complex values on principal branches); long decimal literals keep their digits;
   `identify(x)` recognises exact constants (rationals, algebraic numbers, combinations of π, e, logs) by PSLQ.
@@ -217,7 +218,7 @@ Design notes:
 This is a compact CAS. Integration is heuristic (verified, but
 there is no Risch algorithm). Quartics and higher-degree irreducible polynomials have numeric roots unless
 they are binomial or cyclotomic. Equation solving returns principal solutions, not general families such as
-`x = π/6 + 2kπ`.
+`x = π/6 + 2kπ`; `solve(eq, x, a, b)` lists every solution in an interval (`solve(2 sin(3t) = 1, t, 0, 2π)` gives six).
 
 The solution checker works over the real numbers and handles equations, systems, inequalities in one variable
 and expression transformations, one step per line, not proofs in prose.

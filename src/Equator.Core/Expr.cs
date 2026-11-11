@@ -616,6 +616,8 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
         var ce = Numerics.NumericEval.Eval(e);
         if (cb.Imaginary == 0 && ce.Imaginary == 0 && (cb.Real >= 0 || Math.Abs(ce.Real - Math.Round(ce.Real)) < 1e-15))
             return new Real(Math.Pow(cb.Real, ce.Real));
+        if (cb.Imaginary == 0 && cb.Real < 0 && Numerics.NumericEval.OddRootPower(e) is { } odd)
+            return new Real(odd(cb.Real));
         return Numerics.NumericEval.FromComplex(Complex.Pow(cb, ce));
     }
 
@@ -630,6 +632,12 @@ public abstract class Expr : IEquatable<Expr>, IComparable<Expr>
             return new Num(BigRational.Pow(b, (int)e.Num));
         }
 
+        // Odd roots of negative numbers are real, as in the books and in plots: (-27)^(1/3) = -3, (-8)^(2/3) = 4.
+        if (b.Sign < 0 && !e.Den.IsEven)
+        {
+            var magnitude = RationalPower(-b, e);
+            return e.Num.IsEven ? magnitude : -magnitude;
+        }
         if (b.IsMinusOne)
         {
             if (e.Den == 2) return Power(I, new Num(e.Num));

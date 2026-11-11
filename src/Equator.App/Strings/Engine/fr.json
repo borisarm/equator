@@ -136,6 +136,7 @@
   "table: expected a variable name as the second argument.": "table : un nom de variable était attendu en deuxième argument.",
   "table: too many elements.": "table : trop d'éléments.",
   "range: too many elements.": "range : trop d'éléments.",
+  "solve: more than {0} solutions in the interval.": "solve : plus de {0} solutions dans l'intervalle.",
   "mean of an empty list.": "moyenne d'une liste vide.",
   "median of an empty list.": "médiane d'une liste vide.",
   "clear: expected names.": "clear : des noms étaient attendus.",

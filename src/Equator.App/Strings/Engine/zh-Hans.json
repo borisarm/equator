@@ -136,6 +136,7 @@
   "table: expected a variable name as the second argument.": "table：第二个参数应为变量名。",
   "table: too many elements.": "table：元素太多。",
   "range: too many elements.": "range：元素太多。",
+  "solve: more than {0} solutions in the interval.": "solve：区间内的解超过 {0} 个。",
   "mean of an empty list.": "空列表的平均值。",
   "median of an empty list.": "空列表的中位数。",
   "clear: expected names.": "clear：应为名称。",

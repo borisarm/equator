@@ -150,6 +150,12 @@ public class OpenStaxCorpusTests
         if (SameSets(expected, got)) return null;
         // Trigonometric equations: the books list the solutions in [0, 2π), solve gives a principal period.
         if (!system && realBook && Regex.IsMatch(problem, @"\b(sin|cos|tan)\(") && SameSets(Mod2Pi(expected), Mod2Pi(got))) return null;
+        // ...or every solution in [0, 2π), which solve gives with an interval: 2 sin 3θ = 1 has six.
+        if (!system && realBook && Regex.IsMatch(problem, @"\b(sin|cos|tan)\("))
+        {
+            var inInterval = ResultPoints(Eval($"solve({problem}, {unknowns[0]}, 0, 2*pi)"), unknowns);
+            if (inInterval is not null && SameSets(expected, inInterval)) return null;
+        }
         return $"engine: {Show(result)}";
     }
 
