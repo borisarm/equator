@@ -94,7 +94,50 @@ public sealed partial class MainWindow : Window
             App.Log("activation arguments unavailable: " + ex.Message);
         }
         var args = Environment.GetCommandLineArgs();
-        return args.Length > 1 && File.Exists(args[1]) ? args[1] : null;
+        if (args.Length <= 1) return null;
+        var candidate = args[1];
+        if (!IsSupportedOpenFile(candidate)) return null;
+        try
+        {
+            var fullPath = Path.GetFullPath(candidate);
+            return File.Exists(fullPath) ? fullPath : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private const long MaxOpenFileBytes = 2L * 1024 * 1024;
+
+    private static bool IsSupportedOpenFile(string path)
+    {
+        var ext = Path.GetExtension(path);
+        return ext.Equals(".eqnb", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".txt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ValidateOpenFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) throw new IOException("No file path provided.");
+
+        var fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath)) throw new FileNotFoundException("File not found.", fullPath);
+
+        var info = new FileInfo(fullPath);
+        if ((info.Attributes & FileAttributes.Directory) != 0) throw new IOException("The path is not a file.");
+        if (!IsSupportedOpenFile(fullPath)) throw new IOException("Unsupported file type.");
+        if (info.Length > MaxOpenFileBytes) throw new IOException("The file exceeds the 2 MB size limit.");
+    }
+
+    private static void ValidateTargetPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) throw new IOException("No file path provided.");
+        var fullPath = Path.GetFullPath(path);
+        if (Directory.Exists(fullPath)) throw new IOException("The target path is a directory.");
+        // Do not overwrite a directory or a special device path.
+        if (fullPath.Length == 0 || fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Length == 0)
+            throw new IOException("The target path is invalid.");
     }
 
     private void ResizeAndCenter(int width, int height)
@@ -549,6 +592,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            ValidateOpenFile(path);
             var text = await File.ReadAllTextAsync(path);
             var inputs = Path.GetExtension(path).Equals(".txt", StringComparison.OrdinalIgnoreCase)
                 ? text.Replace("\r\n", "\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList()
@@ -578,7 +622,8 @@ public sealed partial class MainWindow : Window
         }
         try
         {
-            await File.WriteAllTextAsync(_filePath, NotebookFile.Serialize(Cells.Select(c => c.Text)));
+            ValidateTargetPath(_filePath);
+            await File.WriteAllTextAsync(_filePath,NotebookFile.Serialize(Cells.Select(c => c.Text)));
             _dirty = false;
             UpdateTitle();
             SetStatus(Loc.Format("status.saved", Path.GetFileName(_filePath)));
