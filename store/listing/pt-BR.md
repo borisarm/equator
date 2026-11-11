@@ -32,7 +32,7 @@ Feito para o dia a dia:
 • Temas claro e escuro, zoom e atalhos de teclado para tudo.
 • Disponível em English, 中文（简体）, हिन्दी, Español, Français, العربية (da direita para a esquerda), বাংলা e Português (Brasil).
 
-Experimente grátis por 7 dias e depois compre uma única vez: sem assinatura.
+Gratuito: sem período de teste, sem compras no aplicativo e sem assinatura.
 
 ## Recursos do produto
 - Funciona totalmente offline: sem internet, sem anúncios, sem conta, sem assinatura e sem coleta de dados
