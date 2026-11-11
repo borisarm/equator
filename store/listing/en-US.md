@@ -32,7 +32,7 @@ Made for daily use:
 • Light and dark themes, zoom, and keyboard shortcuts for everything.
 • Available in English, 中文（简体）, हिन्दी, Español, Français, العربية (right to left), বাংলা and Português (Brasil).
 
-Try it free for 7 days, then buy it once: no subscription.
+Free to use: no trial, no in-app purchases and no subscription.
 
 ## Product features
 - Works completely offline: no internet connection, no ads, no account, no subscription, no data collection

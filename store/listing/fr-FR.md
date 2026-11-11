@@ -32,7 +32,7 @@ Conçu pour tous les jours :
 • Thèmes clair et sombre, zoom et raccourcis clavier pour tout.
 • Disponible en English, 中文（简体）, हिन्दी, Español, Français, العربية (de droite à gauche), বাংলা et Português (Brasil).
 
-Essayez-le gratuitement pendant 7 jours, puis achetez-le une seule fois : sans abonnement.
+Gratuit : sans période d'essai, sans achats intégrés et sans abonnement.
 
 ## Fonctionnalités du produit
 - Fonctionne entièrement hors connexion : sans Internet, sans publicité, sans compte, sans abonnement, sans collecte de données

@@ -12,12 +12,11 @@ interval, real odd roots of negative numbers, more trigonometric simplifications
 ## Pricing and availability
 Your choice of markets, price and release date. Nothing in the app restricts any market.
 
-- **Base price**: a paid tier (not Free).
-- **Free trial**: **7 days**. The app reads its Store license (`src/Equator.App/Services/Licensing.cs`): during the
-  trial a banner shows the days left and a *Buy EquatorSolver* button (the Store purchase dialog); once the trial
-  expires, notebooks still open, edit and save, but cells no longer evaluate until the app is bought. Without the
-  trial setting, the app has no trial and simply runs as bought.
-- The trial code is in the app since 1.1.0.0; keep the 7-day free trial setting in every submission.
+- **Base price**: **Free** (since November 2026; 1.1.0.0–1.3.0.0 were first sold as paid with a 7-day trial).
+- **Free trial**: **No free trial**, and no per-market price overrides or scheduled price changes.
+- The app still reads its Store license (`src/Equator.App/Services/Licensing.cs`). A free app's license is active
+  and not a trial, so the app runs as bought: no banner, no *Buy* button. Customers who got it while it was free
+  keep it if it ever becomes paid again; the trial code only matters if a paid tier and trial are set again.
 
 ## Properties
 - Category: **Education** (Productivity also fits).
@@ -75,8 +74,8 @@ Diagnostics section of the main README).
 
 **Notes for certification** (optional):
 
-> No account, sign-in or internet connection is needed. The app is paid with a 7-day free trial handled by the
-> Store license; during the trial a banner shows the days left. The app opens with an example worksheet that runs on
+> No account, sign-in or internet connection is needed. The app is free, with no trial and no in-app purchases.
+> The app opens with an example worksheet that runs on
 > start. To test: type an expression such as integrate(x^2*sin(x), x) in the last cell and press Shift+Enter;
 > the Guide tab on the right inserts more examples with one click. The language can be changed from the "…"
 > menu → Language.
