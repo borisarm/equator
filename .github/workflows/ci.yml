@@ -1,0 +1,52 @@
+# Checks every push and pull request: tracked paths must be valid on Windows, the engine tests must pass, and the
+# app must build for both architectures.
+name: CI
+
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paths:
+    name: Windows-safe paths
+    # Linux, so a path Windows cannot check out is still checked out and reported by name.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/check-paths.py
+
+  test:
+    name: Engine tests
+    needs: paths
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test Equator.Core
+        run: dotnet test tests/Equator.Core.Tests/Equator.Core.Tests.csproj -c Release --logger "console;verbosity=minimal"
+
+  build:
+    name: App build (${{ matrix.platform }})
+    needs: paths
+    runs-on: windows-2025
+    strategy:
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build Equator.App
+        run: dotnet build src/Equator.App/Equator.App.csproj -c Release -p:Platform=${{ matrix.platform }}
