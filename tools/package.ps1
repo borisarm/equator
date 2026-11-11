@@ -4,13 +4,17 @@
     an .msixupload for Partner Center.
 
 .DESCRIPTION
-    Output: AppPackages\Equator_<version>.msixupload (upload this in Partner Center → Packages), plus the
-    per-architecture .msix files and the .msixbundle. Packages are unsigned; the Store signs them.
+    Output: AppPackages\<version>\Equator_<version>.msixupload (upload this in Partner Center → Packages), plus
+    the per-architecture .msix files and the .msixbundle. Each version gets its own folder, so building a new
+    version never deletes the packages of an earlier one. Packages are unsigned; the Store signs them.
     Requires the .NET 10 SDK and the Windows 10/11 SDK (makeappx.exe); Visual Studio is not needed.
 
 .PARAMETER Version
     Package version (major.minor.build.0). The Store requires a higher version for every submission; the
     value is written into src\Equator.App\Package.appxmanifest. Defaults to the version in the manifest.
+
+.PARAMETER OutputDir
+    Folder for the packages (default: AppPackages\<version>). It is emptied before the build.
 
 .PARAMETER Platforms
     Architectures to include (default: x64 and ARM64).
@@ -20,12 +24,12 @@
 #>
 param(
     [string]$Version,
+    [string]$OutputDir,
     [string[]]$Platforms = @("x64", "ARM64")
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $root "src\Equator.App\Package.appxmanifest"
-$out = Join-Path $root "AppPackages"
 
 # Version: the fourth field must be 0 for Store packages.
 [xml]$manifest = Get-Content $manifestPath -Raw
@@ -38,6 +42,7 @@ if ($Version) {
     $identity.Version = $Version
 }
 $Version = $identity.Version
+$out = if ($OutputDir) { [IO.Path]::GetFullPath($OutputDir) } else { Join-Path $root "AppPackages\$Version" }
 Write-Host "Packaging $($identity.Name) $Version for $($Platforms -join ', ')"
 
 $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
@@ -50,7 +55,7 @@ New-Item -ItemType Directory -Force $staging | Out-Null
 
 foreach ($platform in $Platforms) {
     Write-Host "Building $platform..."
-    dotnet publish (Join-Path $root "src\Equator.App") -c Release "-p:Platform=$platform" -p:EquatorPackaged=true -nologo -v minimal
+    dotnet publish (Join-Path $root "src\Equator.App") -c Release "-p:Platform=$platform" -p:EquatorPackaged=true "-p:AppxPackageDir=$out/" -nologo -v minimal
     if ($LASTEXITCODE -ne 0) { throw "Build failed for $platform." }
     $arch = $platform.ToLowerInvariant()
     $msix = Get-ChildItem $out -Recurse -Filter "Equator.App_$($Version)_$arch.msix" | Select-Object -First 1

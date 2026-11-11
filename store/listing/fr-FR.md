@@ -49,14 +49,11 @@ Essayez-le gratuitement pendant 7 jours, puis achetez-le une seule fois : sans a
 - Huit langues, dont l'arabe de droite à gauche
 
 ## Nouveautés de cette version
-• Décompositions de matrices : lu, qr, cholesky et svd, ainsi que valeurs singulières et conditionnement.
-• diagonalize et jordan, polynôme minimal et exponentielle de matrice expm(A, t), qui résout les systèmes x' = A·x.
-• Gram–Schmidt, espaces des colonnes et des lignes, projections, moindres carrés (lsq) et pseudo-inverse (pinv).
-• check() vérifie désormais un échelonnement fait à la main : commencez par une matrice, écrivez une matrice par étape, éventuellement avec ses opérations sur les lignes (L2 → L2 − 3L1), et chaque étape est contrôlée.
-• Les équations trigonométriques à angles multiples, comme cos(2t) = sin(t), sont résolues exactement.
-• simplify écrit les quotients complexes sous la forme a + bi et regroupe les racines : 15·⁴√125 / ⁴√5 = 15√5.
-• Corrigé : les inéquations toujours vraies, comme |x + 9| ≥ −6, donnent maintenant tous les réels.
-• Testé sur environ 2 500 exercices de manuels d'algèbre libres.
+• solve(éq, x, a, b) donne toutes les solutions dans un intervalle : solve(2·sin(3t) = 1, t, 0, 2π) donne les six.
+• Les racines impaires des nombres négatifs sont réelles : (−27)^(1/3) = ∛(−27) = −3, donc x^(1/3) = −3 donne maintenant x = −27.
+• simplify connaît davantage d'identités trigonométriques : formules somme-produit, formules d'angles à l'envers et cot, par exemple tan(π/2 − x) = cot(x) et (sin 9t − sin 3t)/(cos 9t + cos 3t) = tan(3t).
+• Ouvrir et enregistrer des cahiers est plus sûr : les fichiers trop volumineux ou endommagés sont refusés avec un message.
+• Testé sur environ 2 500 exercices de manuels libres d'algèbre.
 
 ## Légendes des captures
 1. Écrivez les maths comme sur papier et obtenez des réponses exactes.

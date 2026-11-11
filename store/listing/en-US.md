@@ -49,13 +49,10 @@ Try it free for 7 days, then buy it once: no subscription.
 - Eight languages, including right-to-left Arabic
 
 ## What's new in this version
-• Matrix decompositions: lu, qr, cholesky and svd, plus singular values and the condition number.
-• diagonalize and jordan, the minimal polynomial and the matrix exponential expm(A, t), which solves systems x' = A·x.
-• Gram–Schmidt, column and row spaces, projections, least squares (lsq) and the pseudo-inverse (pinv).
-• check() now checks Gaussian elimination by hand: start with a matrix, write one matrix per step, optionally with its row operations (R2 → R2 − 3R1), and each step is verified.
-• Trigonometric equations with multiple angles, such as cos(2t) = sin(t), are solved exactly.
-• simplify writes complex quotients as a + bi and combines roots: 15·⁴√125 / ⁴√5 = 15√5.
-• Fixed: inequalities that always hold, such as |x + 9| ≥ −6, now give every real number.
+• solve(eq, x, a, b) lists every solution in an interval: solve(2·sin(3t) = 1, t, 0, 2π) gives all six.
+• Odd roots of negative numbers are real: (−27)^(1/3) = ∛(−27) = −3, so x^(1/3) = −3 now gives x = −27.
+• simplify knows more trigonometric identities: sum-to-product formulas, the angle formulas in reverse and cot, for example tan(π/2 − x) = cot(x) and (sin 9t − sin 3t)/(cos 9t + cos 3t) = tan(3t).
+• Opening and saving notebooks is safer: files that are too large or damaged are refused with a message.
 • Tested against about 2,500 exercises from open algebra textbooks.
 
 ## Screenshot captions

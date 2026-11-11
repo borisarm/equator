@@ -49,14 +49,11 @@ Experimente grátis por 7 dias e depois compre uma única vez: sem assinatura.
 - Oito idiomas, incluindo árabe da direita para a esquerda
 
 ## Novidades desta versão
-• Fatorações de matrizes: lu, qr, cholesky e svd, além de valores singulares e número de condição.
-• diagonalize e jordan, polinômio mínimo e exponencial de matriz expm(A, t), que resolve sistemas x' = A·x.
-• Gram–Schmidt, espaços coluna e linha, projeções, mínimos quadrados (lsq) e pseudoinversa (pinv).
-• check() agora confere o escalonamento feito à mão: comece com uma matriz, escreva uma matriz por passo, se quiser com suas operações de linhas (L2 → L2 − 3L1), e cada passo é verificado.
-• Equações trigonométricas com ângulos múltiplos, como cos(2t) = sin(t), são resolvidas de forma exata.
-• simplify escreve quocientes complexos como a + bi e combina raízes: 15·⁴√125 / ⁴√5 = 15√5.
-• Corrigido: inequações que valem sempre, como |x + 9| ≥ −6, agora dão todos os números reais.
-• Testado com cerca de 2.500 exercícios de livros didáticos abertos de álgebra.
+• solve(eq, x, a, b) lista todas as soluções em um intervalo: solve(2·sin(3t) = 1, t, 0, 2π) dá as seis.
+• Raízes ímpares de números negativos são reais: (−27)^(1/3) = ∛(−27) = −3, então x^(1/3) = −3 agora dá x = −27.
+• simplify conhece mais identidades trigonométricas: fórmulas de soma em produto, as fórmulas de ângulos ao contrário e cot, por exemplo tan(π/2 − x) = cot(x) e (sin 9t − sin 3t)/(cos 9t + cos 3t) = tan(3t).
+• Abrir e salvar cadernos ficou mais seguro: arquivos grandes demais ou danificados são recusados com uma mensagem.
+• Testado com cerca de 2.500 exercícios de livros abertos de álgebra.
 
 ## Legendas das capturas
 1. Escreva matemática como no papel e receba respostas exatas.
