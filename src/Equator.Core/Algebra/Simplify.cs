@@ -234,6 +234,27 @@ public static class Simplifier
                 if (ac is not null) cands.Add(ac);
             }
         }
+        // Sum-to-product, then cancelling: (sin 3x − sin x)/sin x → 2 cos 2x.
+        if (basic.ContainsAny(z => z is AddExpr))
+        {
+            var product = Safe(() => SumToProduct(basic));
+            if (product is not null && product != basic)
+            {
+                cands.Add(product);
+                var pc = Safe(() => Rational.Cancel(product));
+                if (pc is not null) cands.Add(pc);
+            }
+            // Angle formulas in reverse over a common denominator: the tangent addition formula
+            // (tan a + tan b)/(1 − tan a tan b) becomes sin(a + b)/cos(a + b), then tan(a + b).
+            var over = Safe(() => Rational.Cancel(basic));
+            var collapsed = over is null ? null : Safe(() => CollapseAngles(over));
+            if (collapsed is not null && collapsed != over)
+            {
+                cands.Add(collapsed);
+                var cc = Safe(() => Rational.Cancel(collapsed));
+                if (cc is not null) cands.Add(cc);
+            }
+        }
         var reduced = Safe(() => TrigReduce(basic));
         if (reduced is not null)
         {
@@ -298,6 +319,77 @@ public static class Simplifier
         return z;
     });
 
+    /// <summary>A term c·f(u) with a numeric coefficient c and f sin or cos, or null.</summary>
+    private static (Expr Coeff, string Name, Expr Arg)? TrigTerm(Expr t)
+    {
+        var (c, rest) = t.SplitCoefficient();
+        return rest is FnExpr { Name: "sin" or "cos" } f ? (c, f.Name, f.Args[0]) : null;
+    }
+
+    /// <summary>
+    /// Sum-to-product on two-term sums whose terms have opposite or equal coefficients:
+    /// sin a ± sin b = 2 sin((a ± b)/2) cos((a ∓ b)/2), cos a + cos b = 2 cos((a + b)/2) cos((a − b)/2),
+    /// cos a − cos b = −2 sin((a + b)/2) sin((a − b)/2).
+    /// </summary>
+    public static Expr SumToProduct(Expr e) => e.MapBottomUp(z =>
+    {
+        if (z is not AddExpr { Terms.Count: 2 } s) return z;
+        if (TrigTerm(s.Terms[0]) is not { } p || TrigTerm(s.Terms[1]) is not { } q || p.Name != q.Name) return z;
+        Expr a = p.Arg, b = q.Arg, c = p.Coeff;
+        bool same = q.Coeff == c, opposite = q.Coeff == -c;
+        if (!same && !opposite) return z;
+        Expr half(Expr u) => Expansion.Expand(u / 2);
+        Expr sum = half(a + b), diff = half(a - b);
+        Expr Sin(Expr u) => Expr.Call("sin", u);
+        Expr Cos(Expr u) => Expr.Call("cos", u);
+        return (p.Name, same) switch
+        {
+            ("sin", true) => 2 * c * Sin(sum) * Cos(diff),
+            ("sin", false) => 2 * c * Cos(sum) * Sin(diff),
+            ("cos", true) => 2 * c * Cos(sum) * Cos(diff),
+            _ => -2 * c * Sin(sum) * Sin(diff),
+        };
+    });
+
+    /// <summary>
+    /// The angle formulas in reverse on two-term sums with equal or opposite coefficients:
+    /// sin a cos b ± cos a sin b = sin(a ± b) and cos a cos b ∓ sin a sin b = cos(a ± b).
+    /// </summary>
+    public static Expr CollapseAngles(Expr e) => e.MapBottomUp(z =>
+    {
+        if (z is not AddExpr { Terms.Count: 2 } s) return z;
+        if (Pair(s.Terms[0]) is not { } p || Pair(s.Terms[1]) is not { } q) return z;
+        bool same = q.Coeff == p.Coeff, opposite = q.Coeff == -p.Coeff;
+        if (!same && !opposite) return z;
+        Expr c = p.Coeff;
+        // Each term as a map from function name to its argument; try both readings of a mixed term.
+        foreach (var (x1, y1) in Readings(p))
+            foreach (var (x2, y2) in Readings(q))
+            {
+                // sin a cos b ± cos a sin b → sin(a ± b)
+                if (x1.Name == "sin" && y1.Name == "cos" && x2.Name == "cos" && y2.Name == "sin" && x1.Arg == x2.Arg && y1.Arg == y2.Arg)
+                    return c * Expr.Call("sin", same ? x1.Arg + y1.Arg : x1.Arg - y1.Arg);
+                // cos a cos b − sin a sin b → cos(a + b); with + → cos(a − b)
+                if (x1.Name == "cos" && y1.Name == "cos" && x2.Name == "sin" && y2.Name == "sin" && x1.Arg == x2.Arg && y1.Arg == y2.Arg)
+                    return c * Expr.Call("cos", opposite ? x1.Arg + y1.Arg : x1.Arg - y1.Arg);
+            }
+        return z;
+
+        static (Expr Coeff, (string Name, Expr Arg) F, (string Name, Expr Arg) G)? Pair(Expr t)
+        {
+            var (coeff, rest) = t.SplitCoefficient();
+            if (rest is not MulExpr { Factors.Count: 2 } m) return null;
+            if (m.Factors[0] is not FnExpr { Name: "sin" or "cos" } f || m.Factors[1] is not FnExpr { Name: "sin" or "cos" } g) return null;
+            return (coeff, (f.Name, f.Args[0]), (g.Name, g.Args[0]));
+        }
+
+        static IEnumerable<((string Name, Expr Arg), (string Name, Expr Arg))> Readings((Expr Coeff, (string Name, Expr Arg) F, (string Name, Expr Arg) G) t)
+        {
+            yield return (t.F, t.G);
+            yield return (t.G, t.F);
+        }
+    });
+
     /// <summary>tan -> sin/cos, sec -> 1/cos, etc.</summary>
     private static Expr ToSinCos(Expr e) => e.MapBottomUp(x => x switch
     {
@@ -309,7 +401,7 @@ public static class Simplifier
         _ => x,
     });
 
-    /// <summary>sin(u)/cos(u) -> tan(u) in products.</summary>
+    /// <summary>sin(u)/cos(u) -> tan(u) and cos(u)/sin(u) -> cot(u) in products.</summary>
     private static Expr FromSinCos(Expr e) => e.MapBottomUp(x =>
     {
         if (x is not MulExpr m) return x;
@@ -320,6 +412,12 @@ public static class Simplifier
                 var cosInv = Expr.Power(Expr.Call("cos", s.Args[0]), Expr.MinusOne);
                 if (m.Factors.Contains(cosInv))
                     return x * Expr.Call("cos", s.Args[0]) / s * Expr.Call("tan", s.Args[0]);
+            }
+            if (f is FnExpr { Name: "cos" } c)
+            {
+                var sinInv = Expr.Power(Expr.Call("sin", c.Args[0]), Expr.MinusOne);
+                if (m.Factors.Contains(sinInv))
+                    return x * Expr.Call("sin", c.Args[0]) / c * Expr.Call("cot", c.Args[0]);
             }
         }
         return x;

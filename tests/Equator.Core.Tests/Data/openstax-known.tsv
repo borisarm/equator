@@ -13,11 +13,6 @@ IA/fs-id1169148884439	real cube roots: root(2x, 3) = -2
 CA/fs-id1167339437693	real cube roots: root(-16z^3, 3) = -2z*root(2, 3)
 
 # Trigonometric identities simplify does not apply.
-AT/fs-id1223240	simplify prefers cos(x)/sin(x) to cot(x)
-AT/fs-id1359485	tangent subtraction formula in reverse
-AT/fs-id2478607	tangent addition formula in reverse
-AT/fs-id1359729	sum-to-product: sin 3x - sin x = 2 cos 2x sin x
-AT/fs-id1871513	sum-to-product on numerator and denominator
 
 # Trigonometric equations of a multiple angle: the books list every solution in [0, 2π); solve gives one period of the argument.
 AT/fs-id1794563	2 sin 3θ = 1: six solutions in [0, 2π)

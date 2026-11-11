@@ -50,6 +50,13 @@ public class KernelTests
     [InlineData("simplify(sin(x)^2 + cos(x)^2)", "1")]
     [InlineData("simplify((x^2 + 2x + 1)/(x + 1))", "x + 1")]
     [InlineData("simplify(2*sin(x)*cos(x))", "sin(2*x)")]
+    [InlineData("simplify(cos(x)/sin(x))", "cot(x)")]
+    [InlineData("simplify((tan(a) + tan(b))/(1 - tan(a)*tan(b)))", "tan(a + b)")]
+    [InlineData("simplify((tan(a) - tan(b))/(1 + tan(a)*tan(b)))", "tan(a - b)")]
+    [InlineData("simplify(sin(a)*cos(b) - cos(a)*sin(b))", "sin(a - b)")]
+    [InlineData("simplify(cos(a)*cos(b) + sin(a)*sin(b))", "cos(a - b)")]
+    [InlineData("simplify((sin(5*x) + sin(x))/(cos(5*x) + cos(x)))", "tan(3*x)")]
+    [InlineData("simplify((cos(x) - cos(3*x))/(sin(3*x) - sin(x)))", "tan(2*x)")]
     [InlineData("together(1/x + 1/y)", "(x + y)/(x*y)")]
     [InlineData("apart(1/(x^2 - 1), x)", "1/(2*(x - 1)) - 1/(2*(x + 1))")]
     // solving
